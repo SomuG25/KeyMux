@@ -1,7 +1,12 @@
 // KeyMux dashboard — vanilla JS, polls /api/state and renders the pool + log.
 const $ = (sel) => document.querySelector(sel);
 
-const PROVIDER_LABELS = { aerolink: "AeroLink", freemodel: "Freemodel" };
+const PROVIDER_LABELS = {
+  aerolink: "AeroLink",
+  freemodel: "Freemodel",
+  agentrouter: "AgentRouter",
+  bluesminds: "BluesMinds",
+};
 let providers = [];
 let testKeyId = null;
 let exhaustKeyId = null;

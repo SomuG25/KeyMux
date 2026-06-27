@@ -12,6 +12,20 @@ export const PROVIDERS = {
     base: "https://cc.freemodel.dev/",
     keyPrefix: "fe_oa_",
   },
+  agentrouter: {
+    id: "agentrouter",
+    label: "AgentRouter",
+    base: "https://agentrouter.org/",
+    keyPrefix: "sk-",
+    oneTimeCredit: true, // one-time credit pool, no weekly reset
+  },
+  bluesminds: {
+    id: "bluesminds",
+    label: "BluesMinds",
+    base: "https://api.bluesminds.com/",
+    keyPrefix: "sk-",
+    oneTimeCredit: true,
+  },
 };
 
 export function getProvider(id) {

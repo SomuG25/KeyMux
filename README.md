@@ -149,12 +149,21 @@ about it — it comes back online by itself a week later.
 
 Providers are defined in [`src/providers.js`](src/providers.js):
 
-| Provider  | Base URL                      | Key prefix   |
-| --------- | ----------------------------- | ------------ |
-| AeroLink  | `https://capi.aerolink.lat/`  | `aero_live_` |
-| Freemodel | `https://cc.freemodel.dev/`   | `fe_oa_`     |
+| Provider    | Base URL                      | Key prefix   | Limit model        |
+| ----------- | ----------------------------- | ------------ | ------------------ |
+| AeroLink    | `https://capi.aerolink.lat/`  | `aero_live_` | weekly reset       |
+| Freemodel   | `https://cc.freemodel.dev/`   | `fe_oa_`     | weekly reset       |
+| AgentRouter | `https://agentrouter.org/`    | `sk-`        | one-time credits   |
+| BluesMinds  | `https://api.bluesminds.com/` | `sk-`        | one-time credits   |
 
 Add more providers by adding an entry there.
+
+**One-time-credit providers** (AgentRouter, BluesMinds) have no weekly reset, so
+their keys carry no `resetAt`. If you mark one **Exhausted**, it stays benched
+until you **Restore** or delete it — there's no weekly clock to auto-revive it
+(unlike AeroLink/Freemodel). Note BluesMinds is OpenAI-oriented; use the **Test**
+button to confirm it answers Claude Code's Anthropic `/v1/messages` format before
+relying on it. AgentRouter blocks non-coding / NSFW traffic and may ban the key.
 
 ---
 

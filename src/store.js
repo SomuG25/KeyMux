@@ -177,11 +177,10 @@ export function markExhausted(id, resetAt) {
   const key = getKeyById(id);
   if (!key) return false;
   key.status = "exhausted";
-  if (resetAt) {
-    key.resetAt = new Date(resetAt).toISOString();
-  } else if (!key.resetAt) {
-    key.resetAt = new Date(Date.now() + WEEK_MS).toISOString();
-  }
+  // Only set a reset if one is given; otherwise keep the key's existing reset.
+  // One-time-credit keys (resetAt === null) stay benched until manually restored
+  // or deleted — there's no weekly clock to revive them.
+  if (resetAt) key.resetAt = new Date(resetAt).toISOString();
   if (data.activeKeyId === id) {
     const next = pickNextKey(id);
     data.activeKeyId = next ? next.id : null;
