@@ -1,0 +1,25 @@
+{
+  "name": "keymux",
+  "version": "1.0.0",
+  "description": "Local proxy + dashboard for rotating Claude Code API keys across multiple providers without restarting Claude Code.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "claude-code",
+    "anthropic",
+    "proxy",
+    "api-key-rotation",
+    "aerolink",
+    "freemodel"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

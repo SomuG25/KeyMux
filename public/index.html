@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KeyMux</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔑</text></svg>" />
+  </head>
+  <body>
+    <div class="bg-glow"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">🔑</span>
+        <div>
+          <h1>KeyMux</h1>
+          <p class="tagline">Key rotation gateway for Claude Code</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span class="endpoint">proxy&nbsp;·&nbsp;<code>localhost:7777</code></span>
+        <button id="rotateBtn" class="btn btn-ghost">
+          <span class="rotate-ico">⟳</span> Rotate Now
+        </button>
+        <button id="addBtn" class="btn btn-primary">+ Add Key</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Active key spotlight -->
+      <section class="active-card" id="activeCard">
+        <div class="active-label">
+          <span class="pulse-dot"></span> CURRENTLY ACTIVE
+        </div>
+        <div class="active-body" id="activeBody">
+          <div class="active-empty">No active key — add one to get started.</div>
+        </div>
+      </section>
+
+      <div class="grid">
+        <!-- Key pool -->
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Key Pool</h2>
+            <span class="count" id="keyCount">0</span>
+          </div>
+          <div class="key-list" id="keyList"></div>
+        </section>
+
+        <!-- Live log -->
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Live Activity</h2>
+            <span class="live-badge"><span class="live-dot"></span>live</span>
+          </div>
+          <div class="log-list" id="logList"></div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Add Key modal -->
+    <div class="modal-backdrop" id="modal">
+      <div class="modal">
+        <div class="modal-head">
+          <h3>Add New Key</h3>
+          <button class="modal-close" id="modalClose">✕</button>
+        </div>
+        <form id="addForm">
+          <label>
+            Label / Nickname
+            <input name="label" placeholder="e.g. Aero main account" autocomplete="off" />
+          </label>
+          <label>
+            Provider
+            <select name="provider" id="providerSelect"></select>
+          </label>
+          <label>
+            API Key
+            <input name="key" placeholder="aero_live_… or fm_…" autocomplete="off" required />
+          </label>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+            <button type="submit" class="btn btn-primary">Add Key</button>
+          </div>
+          <div class="form-error" id="formError"></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Test modal -->
+    <div class="modal-backdrop" id="testModal">
+      <div class="modal">
+        <div class="modal-head">
+          <h3>Test Key</h3>
+          <button class="modal-close" id="testClose">✕</button>
+        </div>
+        <div class="test-body">
+          <p class="test-sub" id="testKeyName"></p>
+          <label>
+            Model to test
+            <input id="testModel" list="modelList" value="claude-opus-4-5" autocomplete="off" />
+            <datalist id="modelList">
+              <option value="claude-opus-4-5"></option>
+              <option value="claude-sonnet-4-5"></option>
+              <option value="opus[1m]"></option>
+              <option value="glm-4.6"></option>
+              <option value="glm-4.5"></option>
+            </datalist>
+          </label>
+          <button class="btn btn-primary full" id="runTestBtn">Run Test</button>
+          <div class="test-result" id="testResult"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

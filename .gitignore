@@ -1,0 +1,9 @@
+node_modules/
+
+# Your real keys live here — never commit secrets.
+keys.json
+
+# Logs / OS cruft
+*.log
+.DS_Store
+Thumbs.db

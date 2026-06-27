@@ -1,0 +1,14 @@
+{
+  "activeKeyId": null,
+  "keys": [
+    {
+      "id": "example-uuid-1111",
+      "label": "Aero main",
+      "provider": "aerolink",
+      "key": "aero_live_REPLACE_ME",
+      "status": "standby",
+      "lastUsed": null,
+      "addedAt": "2026-01-01T00:00:00.000Z"
+    }
+  ]
+}
