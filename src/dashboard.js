@@ -12,6 +12,10 @@ import {
   setActive,
   rotate,
   getKeyById,
+  reconcile,
+  markExhausted,
+  restoreKey,
+  setReset,
 } from "./store.js";
 import { recentLogs, addLog } from "./log.js";
 
@@ -24,6 +28,7 @@ export function createDashboardApp() {
 
   // ---- State ----
   app.get("/api/state", (_req, res) => {
+    reconcile(); // revive keys whose weekly reset has arrived before reporting
     res.json({
       ...publicState(),
       providers: Object.values(PROVIDERS).map((p) => ({ id: p.id, label: p.label })),
@@ -40,13 +45,33 @@ export function createDashboardApp() {
     try {
       const entry = addKey({
         label: req.body.label,
+        account: req.body.account,
         provider: req.body.provider,
         key: req.body.key,
+        resetAt: req.body.resetAt,
       });
       res.json({ ok: true, id: entry.id });
     } catch (err) {
       res.status(400).json({ ok: false, error: err.message });
     }
+  });
+
+  // Mark a key's weekly limit as exhausted (benched until resetAt).
+  app.post("/api/keys/:id/exhaust", (req, res) => {
+    const ok = markExhausted(req.params.id, req.body.resetAt);
+    res.status(ok ? 200 : 404).json({ ok });
+  });
+
+  // Bring an exhausted/failed key back into the rotation manually.
+  app.post("/api/keys/:id/restore", (req, res) => {
+    const ok = restoreKey(req.params.id);
+    res.status(ok ? 200 : 404).json({ ok });
+  });
+
+  // Update just the weekly reset time on a key.
+  app.post("/api/keys/:id/reset", (req, res) => {
+    const ok = setReset(req.params.id, req.body.resetAt);
+    res.status(ok ? 200 : 404).json({ ok });
   });
 
   app.delete("/api/keys/:id", (req, res) => {

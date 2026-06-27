@@ -210,6 +210,10 @@ main { padding: 28px 32px 60px; max-width: 1200px; margin: 0 auto; }
 .status.standby .led { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
 .status.failed { background: rgba(255, 77, 98, 0.13); color: var(--red); }
 .status.failed .led { background: var(--red); box-shadow: 0 0 8px var(--red); }
+.status.exhausted { background: rgba(124, 142, 255, 0.14); color: #9aa6ff; }
+.status.exhausted .led { background: #9aa6ff; box-shadow: 0 0 8px #9aa6ff; }
+.key-card.exhausted { opacity: 0.78; border-color: rgba(124, 142, 255, 0.3); }
+.acct { color: var(--accent-2); }
 
 .key-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .icon-btn {
@@ -223,6 +227,7 @@ main { padding: 28px 32px 60px; max-width: 1200px; margin: 0 auto; }
 .icon-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
 .icon-btn.danger:hover { color: var(--red); border-color: rgba(255, 77, 98, 0.4); }
 .icon-btn.go:hover { color: var(--green); border-color: rgba(31, 212, 122, 0.4); }
+.icon-btn.warn:hover { color: var(--amber); border-color: rgba(255, 176, 32, 0.4); }
 
 .empty-state { color: var(--faint); font-size: 13px; text-align: center; padding: 30px 0; }
 
@@ -293,6 +298,10 @@ input:focus, select:focus {
   box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.18);
 }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+.row { display: flex; gap: 12px; }
+.row label { flex: 1; }
+.opt { color: var(--faint); font-weight: 400; font-size: 11px; }
+input[type="datetime-local"] { color-scheme: dark; }
 .form-error { color: var(--red); font-size: 12px; margin-top: 12px; min-height: 16px; }
 
 .test-sub { font-size: 13px; color: var(--muted); margin-bottom: 18px; }

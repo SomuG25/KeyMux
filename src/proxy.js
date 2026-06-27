@@ -11,6 +11,7 @@ import {
   setActive,
   markUsed,
   markFailed,
+  reconcile,
 } from "./store.js";
 import { addLog } from "./log.js";
 
@@ -72,6 +73,10 @@ export function createProxyApp() {
 
   app.all("/*", async (req, res) => {
     const bodyBuf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+
+    // Revive any keys whose weekly reset arrived, and ensure the active key is
+    // actually usable (auto-advance past exhausted/failed keys).
+    reconcile();
 
     let key = getActiveKey();
     if (!key) {

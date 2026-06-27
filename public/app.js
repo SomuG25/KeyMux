@@ -4,6 +4,8 @@ const $ = (sel) => document.querySelector(sel);
 const PROVIDER_LABELS = { aerolink: "AeroLink", freemodel: "Freemodel" };
 let providers = [];
 let testKeyId = null;
+let exhaustKeyId = null;
+let lastStateKeys = [];
 
 // ---------- Fetch helpers ----------
 async function api(path, opts) {
@@ -30,6 +32,31 @@ function fmtRelative(iso) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+// "5d 17h" / "17h 51m" / "23m" — time remaining until a reset timestamp.
+function fmtCountdown(iso) {
+  if (!iso) return "no reset set";
+  let s = (new Date(iso).getTime() - Date.now()) / 1000;
+  if (s <= 0) return "due now";
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600); s -= h * 3600;
+  const m = Math.floor(s / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+// ISO -> value for <input type="datetime-local"> in local time.
+function toLocalInput(iso) {
+  const d = iso ? new Date(iso) : new Date(Date.now() + 7 * 86400000);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+// datetime-local value (local time) -> ISO string.
+function fromLocalInput(val) {
+  if (!val) return null;
+  return new Date(val).toISOString();
+}
+
 function renderActive(state) {
   const active = state.keys.find((k) => k.id === state.activeKeyId);
   const body = $("#activeBody");
@@ -38,6 +65,7 @@ function renderActive(state) {
     return;
   }
   const provider = PROVIDER_LABELS[active.provider] || active.provider;
+  const acct = active.account ? ` · ${escapeHtml(active.account)}` : "";
   body.innerHTML = `
     <div class="active-key-main">
       <div>
@@ -46,8 +74,9 @@ function renderActive(state) {
       </div>
     </div>
     <div class="active-meta">
-      <div class="provider-chip">● ${escapeHtml(provider)}</div>
+      <div class="provider-chip">● ${escapeHtml(provider)}${acct}</div>
       <div style="margin-top:8px">last used ${fmtRelative(active.lastUsed)}</div>
+      <div style="margin-top:4px">weekly reset in ${fmtCountdown(active.resetAt)}</div>
     </div>`;
 }
 
@@ -62,6 +91,11 @@ function renderKeys(state) {
     .map((k) => {
       const provider = PROVIDER_LABELS[k.provider] || k.provider;
       const isActive = k.status === "active";
+      const acct = k.account ? ` · <span class="acct">${escapeHtml(k.account)}</span>` : "";
+      const meta =
+        k.status === "exhausted"
+          ? `resets in ${fmtCountdown(k.resetAt)} · auto-revives`
+          : `last used ${fmtRelative(k.lastUsed)}${k.resetAt ? ` · weekly reset in ${fmtCountdown(k.resetAt)}` : ""}`;
       return `
       <div class="key-card ${k.status}">
         <div class="key-info">
@@ -69,12 +103,17 @@ function renderKeys(state) {
             <span class="key-name">${escapeHtml(k.label)}</span>
             <span class="status ${k.status}"><span class="led"></span>${k.status}</span>
           </div>
-          <div class="key-sub">${escapeHtml(k.masked)} · ${escapeHtml(provider)}</div>
-          <div class="key-meta">last used ${fmtRelative(k.lastUsed)}</div>
+          <div class="key-sub">${escapeHtml(k.masked)} · ${escapeHtml(provider)}${acct}</div>
+          <div class="key-meta">${meta}</div>
         </div>
         <div class="key-actions">
-          ${isActive ? "" : `<button class="icon-btn go" data-act="activate" data-id="${k.id}">Set Active</button>`}
+          ${isActive || k.status === "exhausted" ? "" : `<button class="icon-btn go" data-act="activate" data-id="${k.id}">Set Active</button>`}
           <button class="icon-btn" data-act="test" data-id="${k.id}" data-label="${escapeAttr(k.label)}">Test</button>
+          ${
+            k.status === "exhausted"
+              ? `<button class="icon-btn go" data-act="restore" data-id="${k.id}">Restore</button>`
+              : `<button class="icon-btn warn" data-act="exhaust" data-id="${k.id}" data-label="${escapeAttr(k.label)}" data-reset="${k.resetAt || ""}">Exhausted</button>`
+          }
           <button class="icon-btn danger" data-act="delete" data-id="${k.id}">Delete</button>
         </div>
       </div>`;
@@ -136,7 +175,7 @@ function populateProviderSelect() {
 $("#keyList").addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-act]");
   if (!btn) return;
-  const { act, id, label } = btn.dataset;
+  const { act, id, label, reset } = btn.dataset;
   if (act === "activate") {
     await api(`/api/keys/${id}/activate`, { method: "POST" });
     refresh();
@@ -147,6 +186,11 @@ $("#keyList").addEventListener("click", async (e) => {
     }
   } else if (act === "test") {
     openTest(id, label);
+  } else if (act === "exhaust") {
+    openExhaust(id, label, reset);
+  } else if (act === "restore") {
+    await api(`/api/keys/${id}/restore`, { method: "POST" });
+    refresh();
   }
 });
 
@@ -169,8 +213,10 @@ $("#addForm").addEventListener("submit", async (e) => {
   const fd = new FormData(e.target);
   const payload = {
     label: fd.get("label"),
+    account: fd.get("account"),
     provider: fd.get("provider"),
     key: fd.get("key"),
+    resetAt: fromLocalInput(fd.get("resetAt")),
   };
   const res = await api("/api/keys", { method: "POST", body: JSON.stringify(payload) });
   if (res.ok) {
@@ -210,6 +256,27 @@ $("#runTestBtn").addEventListener("click", async () => {
   refresh();
 });
 
+// ---------- Exhaust modal ----------
+const exhaustModal = $("#exhaustModal");
+function openExhaust(id, label, reset) {
+  exhaustKeyId = id;
+  $("#exhaustKeyName").textContent = `Bench: ${label}`;
+  $("#exhaustReset").value = toLocalInput(reset || "");
+  exhaustModal.classList.add("open");
+}
+const closeExhaust = () => exhaustModal.classList.remove("open");
+$("#exhaustClose").addEventListener("click", closeExhaust);
+exhaustModal.addEventListener("click", (e) => { if (e.target === exhaustModal) closeExhaust(); });
+$("#confirmExhaustBtn").addEventListener("click", async () => {
+  const resetAt = fromLocalInput($("#exhaustReset").value);
+  await api(`/api/keys/${exhaustKeyId}/exhaust`, {
+    method: "POST",
+    body: JSON.stringify({ resetAt }),
+  });
+  closeExhaust();
+  refresh();
+});
+
 // ---------- Utils ----------
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -219,7 +286,7 @@ function truncate(s, n) { s = String(s ?? ""); return s.length > n ? s.slice(0, 
 
 // Keyboard: Esc closes modals
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { closeModal(); closeTest(); }
+  if (e.key === "Escape") { closeModal(); closeTest(); closeExhaust(); }
 });
 
 // Kick off

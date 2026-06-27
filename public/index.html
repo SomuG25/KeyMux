@@ -75,15 +75,25 @@
         <form id="addForm">
           <label>
             Label / Nickname
-            <input name="label" placeholder="e.g. Aero main account" autocomplete="off" />
+            <input name="label" placeholder="e.g. Aero main" autocomplete="off" />
           </label>
-          <label>
-            Provider
-            <select name="provider" id="providerSelect"></select>
-          </label>
+          <div class="row">
+            <label>
+              Account
+              <input name="account" placeholder="e.g. aaplaclass007" autocomplete="off" />
+            </label>
+            <label>
+              Provider
+              <select name="provider" id="providerSelect"></select>
+            </label>
+          </div>
           <label>
             API Key
-            <input name="key" placeholder="aero_live_… or fm_…" autocomplete="off" required />
+            <input name="key" placeholder="aero_live_… or fe_oa_…" autocomplete="off" required />
+          </label>
+          <label>
+            Weekly limit resets at <span class="opt">(optional)</span>
+            <input name="resetAt" type="datetime-local" autocomplete="off" />
           </label>
           <div class="modal-actions">
             <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
@@ -116,6 +126,27 @@
           </label>
           <button class="btn btn-primary full" id="runTestBtn">Run Test</button>
           <div class="test-result" id="testResult"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exhaust modal -->
+    <div class="modal-backdrop" id="exhaustModal">
+      <div class="modal">
+        <div class="modal-head">
+          <h3>Mark Weekly Limit Exhausted</h3>
+          <button class="modal-close" id="exhaustClose">✕</button>
+        </div>
+        <div class="test-body">
+          <p class="test-sub" id="exhaustKeyName"></p>
+          <label>
+            Benched until this key's weekly limit resets:
+            <input id="exhaustReset" type="datetime-local" autocomplete="off" />
+          </label>
+          <p class="opt" style="margin-top:-6px">
+            KeyMux auto-revives the key at this time, then rolls it forward 7 days each week.
+          </p>
+          <button class="btn btn-primary full" id="confirmExhaustBtn">Bench this key</button>
         </div>
       </div>
     </div>

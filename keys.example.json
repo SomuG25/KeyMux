@@ -1,14 +1,27 @@
 {
-  "activeKeyId": null,
+  "activeKeyId": "example-uuid-1111",
   "keys": [
     {
       "id": "example-uuid-1111",
-      "label": "Aero main",
+      "label": "Aero aaplaclass007",
+      "account": "aaplaclass007",
       "provider": "aerolink",
       "key": "aero_live_REPLACE_ME",
       "status": "standby",
       "lastUsed": null,
-      "addedAt": "2026-01-01T00:00:00.000Z"
+      "addedAt": "2026-01-01T00:00:00.000Z",
+      "resetAt": "2026-01-08T00:00:00.000Z"
+    },
+    {
+      "id": "example-uuid-2222",
+      "label": "Freemodel sngade",
+      "account": "sngade",
+      "provider": "freemodel",
+      "key": "fe_oa_REPLACE_ME",
+      "status": "standby",
+      "lastUsed": null,
+      "addedAt": "2026-01-01T00:00:00.000Z",
+      "resetAt": null
     }
   ]
 }

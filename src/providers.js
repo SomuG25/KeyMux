@@ -10,7 +10,7 @@ export const PROVIDERS = {
     id: "freemodel",
     label: "Freemodel",
     base: "https://cc.freemodel.dev/",
-    keyPrefix: "fm_",
+    keyPrefix: "fe_oa_",
   },
 };
 

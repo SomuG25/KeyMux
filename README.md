@@ -26,13 +26,17 @@ one hits a rate limit (`429`) or auth error (`401`).
 
 - **One-time setup.** Set `ANTHROPIC_BASE_URL` to `http://localhost:7777` once.
 - **Multiple keys & accounts per provider.** Pool as many AeroLink / Freemodel
-  keys as you like.
+  keys as you like, each tagged with the **account** it came from.
+- **Weekly-limit tracking with auto-revive.** Each key has its own weekly reset
+  time. Mark a key **Exhausted** when its weekly cap is spent — KeyMux benches
+  it (and skips it during rotation) until its reset arrives, then automatically
+  brings it back and rolls the reset forward 7 days for the next cycle.
 - **Automatic rotation** on `429` / `401` / network errors — retries the request
-  once on the next key, preferring the **same provider first** (keeps model
-  compatibility intact), then any healthy key.
+  once on the next **usable** key, preferring the **same provider first** (keeps
+  model compatibility intact), then any healthy key. Exhausted keys are skipped.
 - **Live dashboard** — currently active key (masked), full pool with
-  Active / Standby / Failed status, glowing indicators, last-used times, and a
-  live activity log (last 20 requests).
+  Active / Standby / Failed / Exhausted status, glowing indicators, account tags,
+  reset countdowns, last-used times, and a live activity log (last 20 requests).
 - **Per-model health test.** Fire a tiny 1-token request to confirm a specific
   model (e.g. `claude-opus-4-5`, `glm-4.6`) actually works on a given key.
 - **No secrets in the browser.** Keys are masked (`aero_live_****R0k`); raw keys
@@ -61,11 +65,13 @@ On start, KeyMux prints the exact `settings.json` snippet to paste. Then:
 
 Open **http://localhost:7778**, click **+ Add Key**, and add your provider keys:
 
-| Field    | Example                          |
-| -------- | -------------------------------- |
-| Label    | `Aero main`                      |
-| Provider | `AeroLink` or `Freemodel`        |
-| API Key  | `aero_live_…` / `fm_…`           |
+| Field            | Example                          |
+| ---------------- | -------------------------------- |
+| Label            | `Aero aaplaclass007`             |
+| Account          | `aaplaclass007`                  |
+| Provider         | `AeroLink` or `Freemodel`        |
+| API Key          | `aero_live_…` / `fe_oa_…`        |
+| Weekly resets at | *(optional)* when this key's weekly limit refreshes |
 
 The first key you add becomes active automatically.
 
@@ -100,13 +106,15 @@ rotate keys for you when one rate-limits.
 
 ## Dashboard guide
 
-| Control          | What it does                                                        |
-| ---------------- | ------------------------------------------------------------------- |
-| **Set Active**   | Make that key the one the proxy forwards through.                   |
-| **Test**         | Send a real 1-token request for a chosen model; shows status + latency. |
-| **Delete**       | Remove a key from the pool.                                         |
-| **+ Add Key**    | Add a new key (label, provider, key).                               |
-| **Rotate Now**   | Manually switch to the next key (same-provider-first).              |
+| Control            | What it does                                                        |
+| ------------------ | ------------------------------------------------------------------- |
+| **Set Active**     | Make that key the one the proxy forwards through.                   |
+| **Test**           | Send a real 1-token request for a chosen model; shows status + latency. |
+| **Exhausted**      | Bench a key whose weekly limit is spent, until a reset time you set. |
+| **Restore**        | Bring an exhausted key back into rotation early.                    |
+| **Delete**         | Remove a key from the pool.                                         |
+| **+ Add Key**      | Add a new key (label, account, provider, key, optional reset).      |
+| **Rotate Now**     | Manually switch to the next usable key (same-provider-first).       |
 
 **Status meanings**
 
@@ -114,6 +122,21 @@ rotate keys for you when one rate-limits.
 - 🟡 **Standby** — healthy, waiting in the pool.
 - 🔴 **Failed** — last request returned `401`/`429` or errored. Re-activating or
   testing it clears the failure.
+- 🔵 **Exhausted** — weekly limit spent. Skipped during rotation and
+  auto-revived when its reset time arrives (reset then rolls forward 7 days).
+
+### Weekly cycles
+
+Each key carries its own `resetAt` timestamp. KeyMux runs a reconciliation on
+every request and dashboard refresh that:
+
+1. Revives any **exhausted** key whose reset time has passed.
+2. Rolls a passed reset forward in 7-day steps so the countdown always points at
+   the *next* weekly reset.
+3. Auto-advances the active key if it becomes exhausted/failed.
+
+So you can mark a key exhausted the moment its weekly `$70` cap is gone and forget
+about it — it comes back online by itself a week later.
 
 ---
 
@@ -129,7 +152,7 @@ Providers are defined in [`src/providers.js`](src/providers.js):
 | Provider  | Base URL                      | Key prefix   |
 | --------- | ----------------------------- | ------------ |
 | AeroLink  | `https://capi.aerolink.lat/`  | `aero_live_` |
-| Freemodel | `https://cc.freemodel.dev/`   | `fm_`        |
+| Freemodel | `https://cc.freemodel.dev/`   | `fe_oa_`     |
 
 Add more providers by adding an entry there.
 
