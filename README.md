@@ -154,24 +154,41 @@ Providers are defined in [`src/providers.js`](src/providers.js):
 | AeroLink    | `https://capi.aerolink.lat/`  | `aero_live_` | weekly reset       |
 | Freemodel   | `https://cc.freemodel.dev/`   | `fe_oa_`     | weekly reset       |
 | AgentRouter | `https://agentrouter.org/`    | `sk-`        | one-time credits   |
-| BluesMinds  | `https://api.bluesminds.com/` | `sk-`        | one-time credits   |
 
 Add more providers by adding an entry there.
 
-**One-time-credit providers** (AgentRouter, BluesMinds) have no weekly reset, so
-their keys carry no `resetAt`. If you mark one **Exhausted**, it stays benched
-until you **Restore** or delete it — there's no weekly clock to auto-revive it
-(unlike AeroLink/Freemodel). Note BluesMinds is OpenAI-oriented; use the **Test**
-button to confirm it answers Claude Code's Anthropic `/v1/messages` format before
-relying on it. AgentRouter blocks non-coding / NSFW traffic and may ban the key.
+> **Providers must speak the Anthropic API** (`POST /v1/messages`), since that's
+> what Claude Code sends. AeroLink, Freemodel, and AgentRouter do. OpenAI-only
+> gateways (e.g. BluesMinds) return `503 model_not_found` and aren't supported —
+> they'd need a request/response/SSE translation layer.
+
+**One-time-credit providers** (AgentRouter) have no weekly reset, so their keys
+carry no `resetAt`. If you mark one **Exhausted**, it stays benched until you
+**Restore** or delete it — there's no weekly clock to auto-revive it (unlike
+AeroLink/Freemodel). AgentRouter blocks non-coding / NSFW traffic and may ban the key.
 
 ---
+
+## Model mapping (Haiku → GLM)
+
+Claude Code uses a **Haiku-class** "small/fast" model for background tasks. KeyMux
+rewrites every such request to **GLM** before forwarding — for all keys/providers
+— so those background calls run on GLM instead of Haiku. Any request whose
+`model` contains `haiku` is swapped to `glm-5.2`; Opus/Sonnet requests pass
+through untouched. The swap is shown in the activity log (`model … → glm-5.2`).
+
+Override the target model with the `KEYMUX_HAIKU_MODEL` env var:
+
+```bash
+KEYMUX_HAIKU_MODEL="glm-5.2[1m]" npm start
+```
 
 ## How it works
 
 - **Proxy** (`src/proxy.js`) buffers each request body (so it can replay on a
-  retry), forwards it to the active provider with `Authorization: Bearer <key>`
-  (and `x-api-key`), and streams the response straight back (SSE-friendly).
+  retry), rewrites Haiku models to GLM, forwards to the active provider with
+  `Authorization: Bearer <key>` (and `x-api-key`), and streams the response
+  straight back (SSE-friendly).
 - On `429` / `401` / network error it marks the key **failed**, picks the next
   key (same provider first), switches the active key, and **retries once**.
 - **Store** (`src/store.js`) persists the pool to `keys.json`. The active key,

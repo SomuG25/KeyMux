@@ -5,7 +5,6 @@ const PROVIDER_LABELS = {
   aerolink: "AeroLink",
   freemodel: "Freemodel",
   agentrouter: "AgentRouter",
-  bluesminds: "BluesMinds",
 };
 let providers = [];
 let testKeyId = null;

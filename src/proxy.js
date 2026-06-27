@@ -18,6 +18,31 @@ import { addLog } from "./log.js";
 // Status codes that should trigger a rotation + single retry.
 const ROTATE_ON = new Set([401, 429]);
 
+// Claude Code uses a Haiku-class "small/fast" model for background tasks. Map
+// every Haiku request to a GLM model instead, for all providers. Override with
+// KEYMUX_HAIKU_MODEL.
+const HAIKU_MODEL = process.env.KEYMUX_HAIKU_MODEL || "glm-5.2";
+
+// If the JSON body's `model` is a Haiku model, swap it for the GLM model.
+// Returns the (possibly rewritten) body buffer plus a note for the activity log.
+function rewriteModel(bodyBuf, contentType) {
+  if (!bodyBuf || !bodyBuf.length) return { buf: bodyBuf, note: "" };
+  if (contentType && !String(contentType).includes("application/json")) {
+    return { buf: bodyBuf, note: "" };
+  }
+  try {
+    const obj = JSON.parse(bodyBuf.toString("utf8"));
+    if (obj && typeof obj.model === "string" && /haiku/i.test(obj.model)) {
+      const from = obj.model;
+      obj.model = HAIKU_MODEL;
+      return { buf: Buffer.from(JSON.stringify(obj)), note: `model ${from} → ${HAIKU_MODEL}` };
+    }
+  } catch {
+    /* not JSON or unparseable — forward unchanged */
+  }
+  return { buf: bodyBuf, note: "" };
+}
+
 // Hop-by-hop / auth headers we must NOT forward upstream verbatim.
 const STRIP_REQUEST_HEADERS = new Set([
   "host",
@@ -72,7 +97,9 @@ export function createProxyApp() {
   app.use(express.raw({ type: () => true, limit: "50mb" }));
 
   app.all("/*", async (req, res) => {
-    const bodyBuf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    const rawBuf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    // Map Haiku-class requests to GLM before forwarding (applies to every key).
+    const { buf: bodyBuf, note: modelNote } = rewriteModel(rawBuf, req.headers["content-type"]);
 
     // Revive any keys whose weekly reset arrived, and ensure the active key is
     // actually usable (auto-advance past exhausted/failed keys).
@@ -127,7 +154,7 @@ export function createProxyApp() {
           method: req.method,
           path: req.originalUrl,
           status: upstream.status,
-          note: rotated ? "after rotation" : "",
+          note: [rotated ? "after rotation" : "", modelNote].filter(Boolean).join(" · "),
         });
 
         res.status(upstream.status);
