@@ -62,16 +62,25 @@ function fromLocalInput(val) {
   return new Date(val).toISOString();
 }
 
+// Only touch the DOM when the rendered HTML actually changed — this stops the
+// whole UI from flickering / replaying animations on every 2.5s poll.
+const _painted = {};
+function paint(el, html, cacheKey) {
+  if (_painted[cacheKey] === html) return;
+  _painted[cacheKey] = html;
+  el.innerHTML = html;
+}
+
 function renderActive(state) {
   const active = state.keys.find((k) => k.id === state.activeKeyId);
   const body = $("#activeBody");
   if (!active) {
-    body.innerHTML = `<div class="active-empty">No active key — add one to get started.</div>`;
+    paint(body, `<div class="active-empty">No active key — add one to get started.</div>`, "active");
     return;
   }
   const provider = PROVIDER_LABELS[active.provider] || active.provider;
   const acct = active.account ? ` · ${escapeHtml(active.account)}` : "";
-  body.innerHTML = `
+  const html = `
     <div class="active-key-main">
       <div>
         <div class="active-key-name">${escapeHtml(active.label)}</div>
@@ -83,16 +92,19 @@ function renderActive(state) {
       <div style="margin-top:8px">last used ${fmtRelative(active.lastUsed)}</div>
       <div style="margin-top:4px">weekly reset in ${fmtCountdown(active.resetAt)}</div>
     </div>`;
+  paint(body, html, "active");
 }
 
 function renderKeys(state) {
   const list = $("#keyList");
-  $("#keyCount").textContent = state.keys.length;
+  if ($("#keyCount").textContent !== String(state.keys.length)) {
+    $("#keyCount").textContent = state.keys.length;
+  }
   if (state.keys.length === 0) {
-    list.innerHTML = `<div class="empty-state">No keys yet. Click “+ Add Key” to add your first provider key.</div>`;
+    paint(list, `<div class="empty-state">No keys yet. Click “+ Add Key” to add your first provider key.</div>`, "keys");
     return;
   }
-  list.innerHTML = state.keys
+  const html = state.keys
     .map((k) => {
       const provider = PROVIDER_LABELS[k.provider] || k.provider;
       const isActive = k.status === "active";
@@ -124,15 +136,16 @@ function renderKeys(state) {
       </div>`;
     })
     .join("");
+  paint(list, html, "keys");
 }
 
 function renderLog(log) {
   const list = $("#logList");
   if (!log || log.length === 0) {
-    list.innerHTML = `<div class="empty-state">Waiting for proxy activity…</div>`;
+    paint(list, `<div class="empty-state">Waiting for proxy activity…</div>`, "log");
     return;
   }
-  list.innerHTML = log
+  const html = log
     .map((e) => {
       const cls = statusClass(e.status);
       const statusText = e.status === null ? "—" : e.status;
@@ -145,6 +158,7 @@ function renderLog(log) {
       </div>`;
     })
     .join("");
+  paint(list, html, "log");
 }
 
 function statusClass(status) {
