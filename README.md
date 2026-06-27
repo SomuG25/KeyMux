@@ -38,7 +38,7 @@ one hits a rate limit (`429`) or auth error (`401`).
   Active / Standby / Failed / Exhausted status, glowing indicators, account tags,
   reset countdowns, last-used times, and a live activity log (last 20 requests).
 - **Per-model health test.** Fire a tiny 1-token request to confirm a specific
-  model (e.g. `claude-opus-4-5`, `glm-4.6`) actually works on a given key.
+  model (e.g. `opus[1m]`, `claude-sonnet-4-6`, `glm-5.2`) actually works on a given key.
 - **No secrets in the browser.** Keys are masked (`aero_live_****R0k`); raw keys
   never leave the server.
 

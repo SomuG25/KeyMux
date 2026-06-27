@@ -98,7 +98,7 @@ export function createDashboardApp() {
     const provider = getProvider(key.provider);
     if (!provider) return res.status(400).json({ ok: false, error: "unknown provider" });
 
-    const model = (req.body.model || "claude-opus-4-5").trim();
+    const model = (req.body.model || "opus[1m]").trim();
     const url = buildUpstreamUrl(provider.base, "/v1/messages");
     const started = Date.now();
     try {
