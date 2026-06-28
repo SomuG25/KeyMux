@@ -3,6 +3,9 @@ node_modules/
 # Your real keys live here — never commit secrets.
 keys.json
 
+# Living context / persistent-memory handoff file — LOCAL ONLY, never push.
+plot.md
+
 # Logs / OS cruft
 *.log
 .DS_Store
