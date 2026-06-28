@@ -6,6 +6,16 @@ import { createDashboardApp } from "./src/dashboard.js";
 const PROXY_PORT = Number(process.env.KEYMUX_PROXY_PORT) || 7777;
 const DASH_PORT = Number(process.env.KEYMUX_DASH_PORT) || 7778;
 
+// Keep KeyMux alive through transient failures (e.g. the network dropping
+// mid-stream). Without these, an unhandled async error — like a reset upstream
+// socket — would crash the whole server and you'd have to restart it.
+process.on("uncaughtException", (err) => {
+  console.error(`[keymux] uncaught exception (ignored, staying up): ${err?.message || err}`);
+});
+process.on("unhandledRejection", (err) => {
+  console.error(`[keymux] unhandled rejection (ignored, staying up): ${err?.message || err}`);
+});
+
 createProxyApp().listen(PROXY_PORT, () => {
   createDashboardApp().listen(DASH_PORT, () => {
     printBanner();

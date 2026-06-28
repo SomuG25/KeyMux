@@ -173,7 +173,24 @@ export function createProxyApp() {
         });
 
         if (upstream.body) {
-          Readable.fromWeb(upstream.body).pipe(res);
+          const nodeStream = Readable.fromWeb(upstream.body);
+          // If the upstream stream breaks mid-response (e.g. the network drops),
+          // it emits 'error'. Without a listener Node would crash the whole
+          // process — so handle it: log it and tear down this response only.
+          nodeStream.on("error", (err) => {
+            addLog({
+              keyLabel: key.label,
+              provider: provider.label,
+              method: req.method,
+              path: req.originalUrl,
+              status: null,
+              note: `stream interrupted: ${err.message}`,
+            });
+            if (!res.destroyed) res.destroy(err);
+          });
+          // If Claude Code hangs up, stop pulling from upstream.
+          res.on("close", () => nodeStream.destroy());
+          nodeStream.pipe(res);
         } else {
           res.end();
         }
