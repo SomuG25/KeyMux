@@ -18,13 +18,18 @@ import { addLog } from "./log.js";
 // Status codes that should trigger a rotation + single retry.
 const ROTATE_ON = new Set([401, 429]);
 
-// Claude Code uses a Haiku-class "small/fast" model for background tasks. Map
-// every Haiku request to a GLM model instead, for all providers. Override with
-// KEYMUX_HAIKU_MODEL.
-const HAIKU_MODEL = process.env.KEYMUX_HAIKU_MODEL || "glm-5.2";
+// Model remapping. Claude Code sends Anthropic model names; we rewrite some of
+// them to third-party models before forwarding (applies to every provider/key):
+//   - Haiku  (small/fast background model) → GLM      (KEYMUX_HAIKU_MODEL)
+//   - Sonnet (the 1M-context slot we repurpose) → DeepSeek (KEYMUX_SONNET_MODEL)
+// Opus is the main model and passes through untouched. First match wins.
+const MODEL_MAP = [
+  { match: /haiku/i, to: process.env.KEYMUX_HAIKU_MODEL || "glm-5.2" },
+  { match: /sonnet/i, to: process.env.KEYMUX_SONNET_MODEL || "deepseek-v4-pro" },
+];
 
-// If the JSON body's `model` is a Haiku model, swap it for the GLM model.
-// Returns the (possibly rewritten) body buffer plus a note for the activity log.
+// If the JSON body's `model` matches a mapping, swap it. Returns the (possibly
+// rewritten) body buffer plus a note for the activity log.
 function rewriteModel(bodyBuf, contentType) {
   if (!bodyBuf || !bodyBuf.length) return { buf: bodyBuf, note: "" };
   if (contentType && !String(contentType).includes("application/json")) {
@@ -32,10 +37,14 @@ function rewriteModel(bodyBuf, contentType) {
   }
   try {
     const obj = JSON.parse(bodyBuf.toString("utf8"));
-    if (obj && typeof obj.model === "string" && /haiku/i.test(obj.model)) {
-      const from = obj.model;
-      obj.model = HAIKU_MODEL;
-      return { buf: Buffer.from(JSON.stringify(obj)), note: `model ${from} → ${HAIKU_MODEL}` };
+    if (obj && typeof obj.model === "string") {
+      for (const m of MODEL_MAP) {
+        if (m.match.test(obj.model)) {
+          const from = obj.model;
+          obj.model = m.to;
+          return { buf: Buffer.from(JSON.stringify(obj)), note: `model ${from} → ${m.to}` };
+        }
+      }
     }
   } catch {
     /* not JSON or unparseable — forward unchanged */

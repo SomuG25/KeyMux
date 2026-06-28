@@ -169,26 +169,37 @@ AeroLink/Freemodel). AgentRouter blocks non-coding / NSFW traffic and may ban th
 
 ---
 
-## Model mapping (Haiku → GLM)
+## Model mapping
 
-Claude Code uses a **Haiku-class** "small/fast" model for background tasks. KeyMux
-rewrites every such request to **GLM** before forwarding — for all keys/providers
-— so those background calls run on GLM instead of Haiku. Any request whose
-`model` contains `haiku` is swapped to `glm-5.2`; Opus/Sonnet requests pass
-through untouched. The swap is shown in the activity log (`model … → glm-5.2`).
+KeyMux rewrites certain Anthropic model names to third-party models before
+forwarding — for **all** keys/providers — so you can repurpose Claude Code's
+model slots. The swap is shown in the activity log (`model … → …`).
 
-Override the target model with the `KEYMUX_HAIKU_MODEL` env var:
+| Claude Code model | Rewritten to        | Why                                   | Env override          |
+| ----------------- | ------------------- | ------------------------------------- | --------------------- |
+| `*haiku*`         | **`glm-5.2`**       | small/fast background model → GLM      | `KEYMUX_HAIKU_MODEL`  |
+| `*sonnet*` (incl. the 1M slot) | **`deepseek-v4-pro`** | Sonnet slot repurposed → DeepSeek V4 | `KEYMUX_SONNET_MODEL` |
+| `*opus*`          | *(unchanged)*       | your main model stays Claude Opus      | —                     |
+
+First match wins; anything not matched passes through untouched. Override targets
+with env vars:
 
 ```bash
-KEYMUX_HAIKU_MODEL="glm-5.2[1m]" npm start
+KEYMUX_HAIKU_MODEL="glm-5.2" KEYMUX_SONNET_MODEL="deepseek-v4-pro" npm start
 ```
+
+> **About Claude Code's `/model` menu:** KeyMux can't rename the labels in that
+> picker (those are Claude Code's, e.g. "Sonnet 1M") — but functionally, picking
+> **Sonnet** now routes every request to **DeepSeek V4 Pro**, and the small/fast
+> model runs on **GLM-5.2**. So: Opus = real Opus, Sonnet = DeepSeek V4 Pro,
+> background = GLM-5.2.
 
 ## How it works
 
 - **Proxy** (`src/proxy.js`) buffers each request body (so it can replay on a
-  retry), rewrites Haiku models to GLM, forwards to the active provider with
-  `Authorization: Bearer <key>` (and `x-api-key`), and streams the response
-  straight back (SSE-friendly).
+  retry), applies the model map (Haiku→GLM, Sonnet→DeepSeek), forwards to the
+  active provider with `Authorization: Bearer <key>` (and `x-api-key`), and
+  streams the response straight back (SSE-friendly).
 - On `429` / `401` / network error it marks the key **failed**, picks the next
   key (same provider first), switches the active key, and **retries once**.
 - **Store** (`src/store.js`) persists the pool to `keys.json`. The active key,
@@ -197,12 +208,41 @@ KEYMUX_HAIKU_MODEL="glm-5.2[1m]" npm start
 
 ---
 
+## Share with your team / friends
+
+KeyMux runs one shared key pool, so several people can point their Claude Code at
+**your** KeyMux and transparently share the rotation, model mapping, and logs.
+
+**Same network (LAN).** The servers listen on all interfaces, so a friend on the
+same Wi-Fi just sets their `~/.claude/settings.json` `ANTHROPIC_BASE_URL` to your
+machine's LAN IP:
+
+```json
+"ANTHROPIC_BASE_URL": "http://192.168.1.42:7777"
+```
+
+(Find your IP with `ipconfig`. They can also open `http://192.168.1.42:7778` to
+watch the dashboard.) Every request they make shows up in your **Live Activity**
+log with the key/provider/model used — so all traffic across everyone is visible
+in one place.
+
+**Different network.** Expose the proxy port with a tunnel and share the URL:
+
+```bash
+npx cloudflared tunnel --url http://localhost:7777    # or: ngrok http 7777
+```
+
+Each user sets `ANTHROPIC_BASE_URL` to the tunnel URL. (Tunnel `:7778` separately
+if you want them to see the dashboard.)
+
 ## Security note
 
-KeyMux is a **local, single-user tool** — it binds to localhost and stores keys
-in plaintext `keys.json` (gitignored). Don't expose port 7777/7778 to a network
-you don't trust. Be aware that third-party proxies terminate TLS and can see
-your prompts; only route traffic you're comfortable sending through them.
+KeyMux stores keys in plaintext `keys.json` (gitignored) and has **no
+authentication** — anyone who can reach port 7777 uses your keys, and anyone who
+can reach 7778 can add/delete them. So only share it with people you trust, and
+prefer a LAN or an authenticated tunnel over exposing it to the open internet.
+Also note third-party proxies terminate TLS and can see your prompts; only route
+traffic you're comfortable sending through them.
 
 ---
 
