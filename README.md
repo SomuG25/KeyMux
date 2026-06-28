@@ -169,35 +169,30 @@ AeroLink/Freemodel). AgentRouter blocks non-coding / NSFW traffic and may ban th
 
 ---
 
-## Model mapping
+## Model mapping (per-provider)
 
-KeyMux rewrites certain Anthropic model names to third-party models before
-forwarding — for **all** keys/providers — so you can repurpose Claude Code's
-model slots. The swap is shown in the activity log (`model … → …`).
+Model support differs per provider, so rewrites are **per-provider** (defined as
+`modelMap` in [`src/providers.js`](src/providers.js)). This avoids `400`s from
+sending a model a provider doesn't carry. The swap is shown in the activity log.
 
-| Claude Code model | Rewritten to        | Why                                   | Env override          |
-| ----------------- | ------------------- | ------------------------------------- | --------------------- |
-| `*haiku*`         | **`glm-5.2`**       | small/fast background model → GLM      | `KEYMUX_HAIKU_MODEL`  |
-| `*sonnet*` (incl. the 1M slot) | **`deepseek-v4-pro`** | Sonnet slot repurposed → DeepSeek V4 | `KEYMUX_SONNET_MODEL` |
-| `*opus*`          | *(unchanged)*       | your main model stays Claude Opus      | —                     |
+| Claude Code model | On **AeroLink**        | On **Freemodel**     | Why |
+| ----------------- | ---------------------- | -------------------- | --- |
+| `*haiku*`         | → **`glm-5.2`**        | *(real Haiku)*       | only AeroLink serves GLM; Freemodel would `400` on `glm-5.2` |
+| `*sonnet*`        | *(real Sonnet)*        | *(real Sonnet)*      | Sonnet stays real Claude everywhere |
+| `*opus*`          | *(unchanged)*          | *(unchanged)*        | your main model stays Claude Opus |
 
-First match wins; anything not matched passes through untouched. Override targets
-with env vars:
+So: **Opus = real Opus, Sonnet = real Sonnet, Haiku = GLM-5.2 when the active key
+is AeroLink** (real Haiku on Freemodel). Override the GLM target with
+`KEYMUX_HAIKU_MODEL`. Add a `modelMap` to any provider in `providers.js` to remap
+models for that provider only.
 
-```bash
-KEYMUX_HAIKU_MODEL="glm-5.2" KEYMUX_SONNET_MODEL="deepseek-v4-pro" npm start
-```
-
-> **About Claude Code's `/model` menu:** KeyMux can't rename the labels in that
-> picker (those are Claude Code's, e.g. "Sonnet 1M") — but functionally, picking
-> **Sonnet** now routes every request to **DeepSeek V4 Pro**, and the small/fast
-> model runs on **GLM-5.2**. So: Opus = real Opus, Sonnet = DeepSeek V4 Pro,
-> background = GLM-5.2.
+> **Note:** KeyMux can't rename the labels in Claude Code's `/model` picker
+> (those are Claude Code's). It only remaps what each slot routes to, per provider.
 
 ## How it works
 
 - **Proxy** (`src/proxy.js`) buffers each request body (so it can replay on a
-  retry), applies the model map (Haiku→GLM, Sonnet→DeepSeek), forwards to the
+  retry), applies the active provider's model map (e.g. AeroLink Haiku→GLM), forwards to the
   active provider with `Authorization: Bearer <key>` (and `x-api-key`), and
   streams the response straight back (SSE-friendly).
 - On `429` / `401` / network error it marks the key **failed**, picks the next

@@ -18,19 +18,14 @@ import { addLog } from "./log.js";
 // Status codes that should trigger a rotation + single retry.
 const ROTATE_ON = new Set([401, 429]);
 
-// Model remapping. Claude Code sends Anthropic model names; we rewrite some of
-// them to third-party models before forwarding (applies to every provider/key):
-//   - Haiku  (small/fast background model) → GLM      (KEYMUX_HAIKU_MODEL)
-//   - Sonnet (the 1M-context slot we repurpose) → DeepSeek (KEYMUX_SONNET_MODEL)
-// Opus is the main model and passes through untouched. First match wins.
-const MODEL_MAP = [
-  { match: /haiku/i, to: process.env.KEYMUX_HAIKU_MODEL || "glm-5.2" },
-  { match: /sonnet/i, to: process.env.KEYMUX_SONNET_MODEL || "deepseek-v4-pro" },
-];
-
-// If the JSON body's `model` matches a mapping, swap it. Returns the (possibly
-// rewritten) body buffer plus a note for the activity log.
-function rewriteModel(bodyBuf, contentType) {
+// Model remapping is PER-PROVIDER, because each provider carries a different
+// model catalog. A provider defines its own `modelMap` in providers.js; only
+// AeroLink maps Haiku→GLM (it's the one that actually serves glm-5.2). Freemodel
+// has no map, so Haiku stays real Haiku there (sending glm-5.2 to Freemodel 400s).
+// Sonnet and Opus are never rewritten — they pass through as real Claude models.
+function rewriteModel(bodyBuf, contentType, provider) {
+  const map = provider?.modelMap;
+  if (!map || map.length === 0) return { buf: bodyBuf, note: "" };
   if (!bodyBuf || !bodyBuf.length) return { buf: bodyBuf, note: "" };
   if (contentType && !String(contentType).includes("application/json")) {
     return { buf: bodyBuf, note: "" };
@@ -38,7 +33,7 @@ function rewriteModel(bodyBuf, contentType) {
   try {
     const obj = JSON.parse(bodyBuf.toString("utf8"));
     if (obj && typeof obj.model === "string") {
-      for (const m of MODEL_MAP) {
+      for (const m of map) {
         if (m.match.test(obj.model)) {
           const from = obj.model;
           obj.model = m.to;
@@ -107,8 +102,6 @@ export function createProxyApp() {
 
   app.all("/*", async (req, res) => {
     const rawBuf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-    // Map Haiku-class requests to GLM before forwarding (applies to every key).
-    const { buf: bodyBuf, note: modelNote } = rewriteModel(rawBuf, req.headers["content-type"]);
 
     // Revive any keys whose weekly reset arrived, and ensure the active key is
     // actually usable (auto-advance past exhausted/failed keys).
@@ -131,6 +124,13 @@ export function createProxyApp() {
     let rotated = false;
     while (true) {
       attempt++;
+      // Apply this provider's model map (re-applied if we rotate to another
+      // provider mid-request).
+      const { buf: bodyBuf, note: modelNote } = rewriteModel(
+        rawBuf,
+        req.headers["content-type"],
+        getProvider(key.provider)
+      );
       try {
         const { upstream, provider } = await forwardOnce(req, bodyBuf, key);
 
