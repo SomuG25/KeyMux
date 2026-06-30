@@ -103,16 +103,48 @@ function renderKeys(state) {
     paint(list, `<div class="empty-state">No keys yet. Click “+ Add Key” to add your first provider key.</div>`, "keys");
     return;
   }
-  const html = state.keys
-    .map((k) => {
-      const provider = PROVIDER_LABELS[k.provider] || k.provider;
-      const isActive = k.status === "active";
-      const acct = k.account ? ` · <span class="acct">${escapeHtml(k.account)}</span>` : "";
-      const meta =
-        k.status === "exhausted"
-          ? `resets in ${fmtCountdown(k.resetAt)} · auto-revives`
-          : `last used ${fmtRelative(k.lastUsed)}${k.resetAt ? ` · weekly reset in ${fmtCountdown(k.resetAt)}` : ""}`;
+
+  // Group keys by provider so AeroLink vs Freemodel are visually distinct, each
+  // with a header showing how that provider's pool is doing (ready / benched).
+  const order = ["aerolink", "freemodel", "agentrouter"];
+  const groups = {};
+  for (const k of state.keys) (groups[k.provider] ||= []).push(k);
+  const providerIds = Object.keys(groups).sort(
+    (a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99)
+  );
+
+  const html = providerIds
+    .map((pid) => {
+      const keys = groups[pid];
+      const label = PROVIDER_LABELS[pid] || pid;
+      const ready = keys.filter((k) => k.status === "active" || k.status === "standby").length;
+      const benched = keys.length - ready;
+      const summary =
+        `<span class="grp-stat ok">${ready} ready</span>` +
+        (benched ? `<span class="grp-stat down">${benched} benched</span>` : "");
+      const cards = keys.map(renderKeyCard).join("");
       return `
+      <div class="provider-group prov-${pid}">
+        <div class="group-head">
+          <span class="group-name"><span class="prov-dot"></span>${escapeHtml(label)}</span>
+          <span class="group-summary">${summary}<span class="grp-count">${keys.length}</span></span>
+        </div>
+        ${cards}
+      </div>`;
+    })
+    .join("");
+  paint(list, html, "keys");
+}
+
+function renderKeyCard(k) {
+  const provider = PROVIDER_LABELS[k.provider] || k.provider;
+  const isActive = k.status === "active";
+  const acct = k.account ? ` · <span class="acct">${escapeHtml(k.account)}</span>` : "";
+  const meta =
+    k.status === "exhausted"
+      ? `resets in ${fmtCountdown(k.resetAt)} · auto-revives`
+      : `last used ${fmtRelative(k.lastUsed)}${k.resetAt ? ` · weekly reset in ${fmtCountdown(k.resetAt)}` : ""}`;
+  return `
       <div class="key-card ${k.status}">
         <div class="key-info">
           <div class="key-top">
@@ -133,9 +165,6 @@ function renderKeys(state) {
           <button class="icon-btn danger" data-act="delete" data-id="${k.id}">Delete</button>
         </div>
       </div>`;
-    })
-    .join("");
-  paint(list, html, "keys");
 }
 
 function renderLog(log) {
