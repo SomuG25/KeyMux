@@ -66,22 +66,14 @@ agent trusts it.
 
 ## Model lineup (the user's)
 
-**Everything runs on GLM-5.2[1m] on AeroLink** (the cheap GLM rate). Claude Code
-keeps sending its normal model names; the proxy swaps all of them to GLM:
+- Main: **Opus 4.8** (`opus[1m]` / `claude-opus-4-8`) — passthrough.
+- Mid: **Sonnet 4.6** (`claude-sonnet-4-6`) — passthrough.
+- Small/fast (Haiku slot): **GLM-5.2** — proxy rewrites any `*haiku*` model →
+  `glm-5.2` on AeroLink (override `KEYMUX_GLM_MODEL`).
 
-- Opus slot (`opus[1m]` / `claude-opus-4-8`) → **GLM-5.2[1m]**
-- Sonnet slot (`claude-sonnet-4-6`) → **GLM-5.2[1m]**
-- Haiku slot (`claude-haiku-*`) → **GLM-5.2[1m]**
-
-Override the GLM target with `KEYMUX_GLM_MODEL`. On Freemodel/AgentRouter
-(no `modelMap`) the slots stay real Claude — GLM would 400 there.
-
-⚠️ **Never set Claude Code's `model` to a raw `glm-*` name.** It only works on
-AeroLink keys; on Freemodel it 403s and on a tier-locked AeroLink account it
-400s with "暂不支持". Always use a Claude slot (`opus[1m]`) — the proxy rewrites
-it to GLM only where that's safe (AeroLink), and leaves it as real Claude
-elsewhere. The proxy marks any key that rejects GLM as **failed** (red) with a
-reason, but does not rotate off it — switch via Set Active / Rotate Now.
+Opus/Sonnet/Haiku stay real Claude on Freemodel/AgentRouter (no `modelMap`). The
+proxy marks any key that rejects GLM as **failed** (red) with a reason, but does
+not rotate off it — switch via Set Active / Rotate Now.
 
 ## Key features
 

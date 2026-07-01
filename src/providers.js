@@ -5,10 +5,9 @@ export const PROVIDERS = {
     label: "AeroLink",
     base: "https://capi.aerolink.lat/",
     keyPrefix: "aero_live_",
-    // AeroLink serves GLM, so EVERY Claude Code slot (Opus/Sonnet/Haiku) maps
-    // to GLM-5.2[1m] here to run on the cheap GLM rate. Claude Code still sends
-    // its normal model names; the proxy swaps them on the way out.
-    modelMap: [{ match: /opus|sonnet|haiku/i, to: process.env.KEYMUX_GLM_MODEL || "glm-5.2[1m]" }],
+    // AeroLink serves GLM, so the Haiku (small/fast) slot maps to GLM here.
+    // Opus and Sonnet pass through as real Claude models.
+    modelMap: [{ match: /haiku/i, to: process.env.KEYMUX_GLM_MODEL || "glm-5.2" }],
   },
   freemodel: {
     id: "freemodel",

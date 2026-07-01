@@ -16,9 +16,8 @@ const ROTATE_ON = new Set([401, 429]);
 
 // Model remapping is PER-PROVIDER, because each provider carries a different
 // model catalog. A provider defines its own `modelMap` in providers.js; AeroLink
-// maps every slot (Opus/Sonnet/Haiku) → glm-5.2[1m] (it's the one that serves
-// GLM). Freemodel has no map, so Opus/Sonnet/Haiku stay real Claude there
-// (sending glm-5.2 to Freemodel 400s). A raw glm-5.2* name passes through
+// maps the Haiku slot → glm-5.2 (it's the one that serves GLM). Opus and Sonnet
+// pass through as real Claude everywhere. A raw glm-5.2* name passes through
 // unchanged, so the map is idempotent.
 function rewriteModel(bodyBuf, contentType, provider) {
   const map = provider?.modelMap;

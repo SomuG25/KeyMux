@@ -182,23 +182,22 @@ Model support differs per provider, so rewrites are **per-provider** (defined as
 `modelMap` in [`src/providers.js`](src/providers.js)). This avoids `400`s from
 sending a model a provider doesn't carry. The swap is shown in the activity log.
 
-By default **every Claude Code slot maps to GLM-5.2[1m] on AeroLink** (the cheap
-GLM rate). Claude Code keeps sending its normal Opus/Sonnet/Haiku names; the proxy
-swaps them on the way out.
+By default **only the Haiku slot maps to GLM-5.2 on AeroLink** (the cheap
+small/fast model). Opus and Sonnet pass through as real Claude everywhere.
 
 | Claude Code model | On **AeroLink**        | On **Freemodel**     | Why |
 | ----------------- | ---------------------- | -------------------- | --- |
-| `*opus*`          | → **`glm-5.2[1m]`**    | *(real Opus)*        | run everything on the cheap GLM rate |
-| `*sonnet*`        | → **`glm-5.2[1m]`**    | *(real Sonnet)*      | run everything on the cheap GLM rate |
-| `*haiku*`         | → **`glm-5.2[1m]`**    | *(real Haiku)*       | only AeroLink serves GLM; Freemodel would `400` on `glm-5.2` |
+| `*opus*`          | *(unchanged)*          | *(unchanged)*        | your main model stays real Claude Opus |
+| `*sonnet*`        | *(real Sonnet)*        | *(real Sonnet)*      | Sonnet stays real Claude everywhere |
+| `*haiku*`         | → **`glm-5.2`**        | *(real Haiku)*       | only AeroLink serves GLM; Freemodel would `400` on `glm-5.2` |
 
 Override the GLM target with `KEYMUX_GLM_MODEL`. Add a `modelMap` to any provider
 in `providers.js` to remap models for that provider only.
 
 > ⚠️ **Never set Claude Code's `model` to a raw `glm-*` name.** GLM only works on
 > AeroLink keys — Freemodel 403s on it and a tier-locked AeroLink account 400s
-> with "暂不支持". Always pick a Claude slot (`opus[1m]`); the proxy rewrites to
-> GLM only on AeroLink (where it's safe) and leaves it as real Claude elsewhere.
+> with "暂不支持". Pick a Claude slot; the proxy rewrites the Haiku slot to GLM
+> only on AeroLink (where it's safe) and leaves everything else as real Claude.
 > If the active key rejects GLM, the proxy marks it **failed** (red) with a
 > reason and surfaces the error — it does **not** rotate off it.
 
