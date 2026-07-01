@@ -46,7 +46,7 @@ agent trusts it.
 ## Run / verify
 
 - Start (user does this): `npm start` → proxy `:7777`, dashboard `:7778`.
-- Env overrides: `KEYMUX_PROXY_PORT`, `KEYMUX_DASH_PORT`, `KEYMUX_HAIKU_MODEL`.
+- Env overrides: `KEYMUX_PROXY_PORT`, `KEYMUX_DASH_PORT`, `KEYMUX_GLM_MODEL`.
 - Syntax check before commit: `node --check src/<file>.js`.
 - Static (HTML/CSS/JS) changes need only a browser hard-refresh; `src/*.js`
   changes need a server restart (user does it).
@@ -65,10 +65,15 @@ agent trusts it.
 
 ## Model lineup (the user's)
 
-- Main: **Opus 4.8** (`opus[1m]` / `claude-opus-4-8`) — passthrough.
-- Mid: **Sonnet 4.6** (`claude-sonnet-4-6`) — passthrough.
-- Small/fast (Haiku slot): **GLM-5.2** — proxy rewrites any `*haiku*` model →
-  `glm-5.2` for all providers (override `KEYMUX_HAIKU_MODEL`).
+**Everything runs on GLM-5.2[1m] on AeroLink** (the cheap GLM rate). Claude Code
+keeps sending its normal model names; the proxy swaps all of them to GLM:
+
+- Opus slot (`opus[1m]` / `claude-opus-4-8`) → **GLM-5.2[1m]**
+- Sonnet slot (`claude-sonnet-4-6`) → **GLM-5.2[1m]**
+- Haiku slot (`claude-haiku-*`) → **GLM-5.2[1m]**
+
+Override the GLM target with `KEYMUX_GLM_MODEL`. On Freemodel/AgentRouter
+(no `modelMap`) the slots stay real Claude — GLM would 400 there.
 
 ## Key features
 

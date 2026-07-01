@@ -20,10 +20,11 @@ import { captureHeaders } from "./capture.js";
 const ROTATE_ON = new Set([401, 429]);
 
 // Model remapping is PER-PROVIDER, because each provider carries a different
-// model catalog. A provider defines its own `modelMap` in providers.js; only
-// AeroLink maps Haiku→GLM (it's the one that actually serves glm-5.2). Freemodel
-// has no map, so Haiku stays real Haiku there (sending glm-5.2 to Freemodel 400s).
-// Sonnet and Opus are never rewritten — they pass through as real Claude models.
+// model catalog. A provider defines its own `modelMap` in providers.js; AeroLink
+// maps every slot (Opus/Sonnet/Haiku) → glm-5.2[1m] (it's the one that serves
+// GLM). Freemodel has no map, so Opus/Sonnet/Haiku stay real Claude there
+// (sending glm-5.2 to Freemodel 400s). A raw glm-5.2* name passes through
+// unchanged, so the map is idempotent.
 function rewriteModel(bodyBuf, contentType, provider) {
   const map = provider?.modelMap;
   if (!map || map.length === 0) return { buf: bodyBuf, note: "" };

@@ -31,7 +31,7 @@ function printBanner() {
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
     },
     permissions: { allow: [], deny: [] },
-    model: "opus[1m]",
+    model: "opus[1m]", // on AeroLink the proxy rewrites this to glm-5.2[1m]
     skipDangerousModePermissionPrompt: true,
   };
 

@@ -175,16 +175,18 @@ Model support differs per provider, so rewrites are **per-provider** (defined as
 `modelMap` in [`src/providers.js`](src/providers.js)). This avoids `400`s from
 sending a model a provider doesn't carry. The swap is shown in the activity log.
 
+By default **every Claude Code slot maps to GLM-5.2[1m] on AeroLink** (the cheap
+GLM rate). Claude Code keeps sending its normal Opus/Sonnet/Haiku names; the proxy
+swaps them on the way out.
+
 | Claude Code model | On **AeroLink**        | On **Freemodel**     | Why |
 | ----------------- | ---------------------- | -------------------- | --- |
-| `*haiku*`         | → **`glm-5.2`**        | *(real Haiku)*       | only AeroLink serves GLM; Freemodel would `400` on `glm-5.2` |
-| `*sonnet*`        | *(real Sonnet)*        | *(real Sonnet)*      | Sonnet stays real Claude everywhere |
-| `*opus*`          | *(unchanged)*          | *(unchanged)*        | your main model stays Claude Opus |
+| `*opus*`          | → **`glm-5.2[1m]`**    | *(real Opus)*        | run everything on the cheap GLM rate |
+| `*sonnet*`        | → **`glm-5.2[1m]`**    | *(real Sonnet)*      | run everything on the cheap GLM rate |
+| `*haiku*`         | → **`glm-5.2[1m]`**    | *(real Haiku)*       | only AeroLink serves GLM; Freemodel would `400` on `glm-5.2` |
 
-So: **Opus = real Opus, Sonnet = real Sonnet, Haiku = GLM-5.2 when the active key
-is AeroLink** (real Haiku on Freemodel). Override the GLM target with
-`KEYMUX_HAIKU_MODEL`. Add a `modelMap` to any provider in `providers.js` to remap
-models for that provider only.
+Override the GLM target with `KEYMUX_GLM_MODEL`. Add a `modelMap` to any provider
+in `providers.js` to remap models for that provider only.
 
 > **Note:** KeyMux can't rename the labels in Claude Code's `/model` picker
 > (those are Claude Code's). It only remaps what each slot routes to, per provider.
