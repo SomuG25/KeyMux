@@ -76,6 +76,13 @@ keeps sending its normal model names; the proxy swaps all of them to GLM:
 Override the GLM target with `KEYMUX_GLM_MODEL`. On Freemodel/AgentRouter
 (no `modelMap`) the slots stay real Claude — GLM would 400 there.
 
+⚠️ **Never set Claude Code's `model` to a raw `glm-*` name.** It only works on
+AeroLink keys; on Freemodel it 403s and on a tier-locked AeroLink account it
+400s with "暂不支持". Always use a Claude slot (`opus[1m]`) — the proxy rewrites
+it to GLM only where that's safe (AeroLink), and leaves it as real Claude
+elsewhere. The proxy marks any key that rejects GLM as **failed** (red) with a
+reason, but does not rotate off it — switch via Set Active / Rotate Now.
+
 ## Key features
 
 - Multiple keys/accounts per provider; each key tagged with its `account`.

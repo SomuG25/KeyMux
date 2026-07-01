@@ -195,6 +195,13 @@ swaps them on the way out.
 Override the GLM target with `KEYMUX_GLM_MODEL`. Add a `modelMap` to any provider
 in `providers.js` to remap models for that provider only.
 
+> ⚠️ **Never set Claude Code's `model` to a raw `glm-*` name.** GLM only works on
+> AeroLink keys — Freemodel 403s on it and a tier-locked AeroLink account 400s
+> with "暂不支持". Always pick a Claude slot (`opus[1m]`); the proxy rewrites to
+> GLM only on AeroLink (where it's safe) and leaves it as real Claude elsewhere.
+> If the active key rejects GLM, the proxy marks it **failed** (red) with a
+> reason and surfaces the error — it does **not** rotate off it.
+
 > **Note:** KeyMux can't rename the labels in Claude Code's `/model` picker
 > (those are Claude Code's). It only remaps what each slot routes to, per provider.
 
