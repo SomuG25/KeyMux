@@ -63,28 +63,29 @@ function isGlmRequest(rawBuf, rewrittenBuf) {
 }
 
 // Detect a "this key/provider rejects GLM" failure from the upstream status +
-// (peeked) body. Returns a short reason string, or "" if not a GLM rejection.
-//   - 400 with Chinese "暂不支持" (model not supported) — tier-locked AeroLink
-//   - 403 forbidden on a GLM request — Freemodel blocks GLM entirely
-// Note: the body is only peeked on 400/403 (tiny, non-streaming error bodies),
-// never on 200 — success streams straight through untouched.
-async function detectGlmRejection(upstream, glmSent) {
-  if (!glmSent) return "";
-  if (upstream.status !== 400 && upstream.status !== 403) return "";
+// (buffered) body. Buffers the body ONCE and returns { reason, text }:
+//   - reason: short note if it's a GLM rejection ("" otherwise)
+//   - text: the raw buffered body (caller must send it — the stream is consumed)
+//   - 400 "暂不支持" (model not supported) — tier-locked AeroLink account
+//   - 403 forbidden — Freemodel blocks GLM entirely
+// The caller only enters this path for GLM-routed 400/403, so the body is always
+// buffered here; 200 responses stream straight through untouched.
+async function detectGlmRejection(upstream) {
+  let text = "";
   try {
-    const text = (await upstream.text()).slice(0, 400);
-    // AeroLink tier-lock: "你请求的模型 ... 暂不支持" (model not supported).
-    if (/暂不支持|model.{0,30}not (?:supported|found)|not available/i.test(text)) {
-      return "key rejects GLM (tier-locked) — switch to an AeroLink key that serves GLM";
-    }
-    // Freemodel: "This service is restricted" / forbidden for GLM.
-    if (upstream.status === 403) {
-      return "provider rejects GLM (use a Claude model or an AeroLink key)";
-    }
+    text = (await upstream.text()).slice(0, 400);
   } catch {
-    /* body unreadable — treat as generic */
+    return { reason: "", text: "" };
   }
-  return "";
+  // AeroLink tier-lock: "你请求的模型 ... 暂不支持" (model not supported).
+  if (/暂不支持|model.{0,30}not (?:supported|found)|not available/i.test(text)) {
+    return { reason: "key rejects GLM (tier-locked) — switch to an AeroLink key that serves GLM", text };
+  }
+  // Freemodel: "This service is restricted" / forbidden for GLM.
+  if (upstream.status === 403) {
+    return { reason: "provider rejects GLM (use a Claude model or an AeroLink key)", text };
+  }
+  return { reason: "", text };
 }
 
 // Hop-by-hop / auth headers we must NOT forward upstream verbatim.
@@ -177,27 +178,28 @@ export function createProxyApp() {
       const { upstream, provider } = await forwardOnce(req, bodyBuf, key);
       const glmSent = isGlmRequest(rawBuf, bodyBuf);
 
-      // GLM-rejection (tier-locked AeroLink 400 / Freemodel 403): the active key
-      // can't serve GLM. Mark it failed (red) with a clear reason — but do NOT
-      // rotate. The peeked body is returned verbatim so Claude Code sees the real
-      // upstream error. The user switches keys via Set Active / Rotate Now.
-      if (upstream.status === 400 || upstream.status === 403) {
-        const reason = await detectGlmRejection(upstream, glmSent);
+      // On a GLM-routed 400/403 the body is buffered here (once) so we can both
+      // detect a GLM rejection AND return the error verbatim. The stream is now
+      // consumed, so we always send the buffered text — never try to re-stream.
+      if (glmSent && (upstream.status === 400 || upstream.status === 403)) {
+        const { reason, text } = await detectGlmRejection(upstream);
         if (reason) {
-          markFailed(key.id);
-          const errBody = await upstream.text();
-          addLog({
-            keyLabel: key.label,
-            provider: provider.label,
-            method: req.method,
-            path: req.originalUrl,
-            status: upstream.status,
-            note: reason,
-          });
-          res.status(upstream.status);
-          res.setHeader("content-type", "application/json");
-          return res.send(errBody);
+          markFailed(key.id); // red — this key rejects GLM. No rotation.
         }
+        addLog({
+          keyLabel: key.label,
+          provider: provider.label,
+          method: req.method,
+          path: req.originalUrl,
+          status: upstream.status,
+          note: reason || modelNote,
+        });
+        res.status(upstream.status);
+        upstream.headers.forEach((value, name) => {
+          if (STRIP_RESPONSE_HEADERS.has(name.toLowerCase())) return;
+          res.setHeader(name, value);
+        });
+        return res.send(text);
       }
 
       // Mark the active key failed on rate-limit/auth so it shows red, but do
