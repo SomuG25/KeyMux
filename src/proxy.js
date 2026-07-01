@@ -14,6 +14,7 @@ import {
   reconcile,
 } from "./store.js";
 import { addLog } from "./log.js";
+import { captureHeaders } from "./capture.js";
 
 // Status codes that should trigger a rotation + single retry.
 const ROTATE_ON = new Set([401, 429]);
@@ -102,6 +103,12 @@ export function createProxyApp() {
 
   app.all("/*", async (req, res) => {
     const rawBuf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+
+    // Record this real client's header signature so the dashboard health-test
+    // can replay it (providers like Freemodel only accept the genuine CLI).
+    if (req.method === "POST" && req.path.includes("/messages")) {
+      captureHeaders(req.headers);
+    }
 
     // Revive any keys whose weekly reset arrived, and ensure the active key is
     // actually usable (auto-advance past exhausted/failed keys).

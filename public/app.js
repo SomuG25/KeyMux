@@ -294,16 +294,28 @@ $("#runTestBtn").addEventListener("click", async () => {
     method: "POST",
     body: JSON.stringify({ model }),
   });
-  const cls = res.ok ? "ok" : res.inconclusive ? "warn" : "err";
-  const icon = res.ok ? "✓" : res.inconclusive ? "?" : "✕";
+  const v = res.verdict || (res.ok ? "ok" : "fail");
+  const cls = v === "ok" ? "ok" : v === "no-cli" || v === "tier" ? "warn" : "err";
+  const icon = v === "ok" ? "✓" : v === "no-cli" || v === "tier" ? "!" : "✕";
   const statusTxt = res.status === null ? "no response" : `HTTP ${res.status}`;
-  const note = res.inconclusive
-    ? `<div class="res-detail">This provider blocks test pings from anything but the real Claude Code client, so the key can't be self-tested here. The key may still be fine — confirm by using it in Claude Code.</div>`
-    : res.detail
-    ? `<div class="res-detail">${escapeHtml(res.detail)}</div>`
-    : "";
+  const label =
+    v === "tier"
+      ? " · account tier insufficient"
+      : v === "no-cli"
+      ? " · inconclusive"
+      : v === "auth"
+      ? " · bad key (auth failed)"
+      : "";
+  let note = "";
+  if (v === "no-cli") {
+    note = `<div class="res-detail">Couldn't impersonate the Claude Code client${res.usedCapturedHeaders ? " even with captured headers" : " — no real request captured yet. Run any prompt in Claude Code through KeyMux first, then re-test."}. The key may still be fine; confirm by using it in Claude Code.</div>`;
+  } else if (v === "tier") {
+    note = `<div class="res-detail">This account is tier-restricted for <b>${escapeHtml(res.model)}</b> on the provider's side — not a KeyMux issue. Try a lower model (e.g. Sonnet), use a different account, or upgrade this account.${res.detail ? " " + escapeHtml(res.detail) : ""}</div>`;
+  } else if (res.detail) {
+    note = `<div class="res-detail">${escapeHtml(res.detail)}</div>`;
+  }
   result.innerHTML = `
-    <div class="res-line ${cls}">${icon} ${statusTxt} · ${res.latencyMs}ms · ${escapeHtml(res.model)}${res.inconclusive ? " · inconclusive" : ""}</div>
+    <div class="res-line ${cls}">${icon} ${statusTxt} · ${res.latencyMs}ms · ${escapeHtml(res.model)}${label}</div>
     ${note}`;
   refresh();
 });

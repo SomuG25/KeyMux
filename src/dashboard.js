@@ -18,6 +18,7 @@ import {
   setReset,
 } from "./store.js";
 import { recentLogs, addLog } from "./log.js";
+import { getCapturedHeaders, captureInfo } from "./capture.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -33,6 +34,7 @@ export function createDashboardApp() {
       ...publicState(),
       providers: Object.values(PROVIDERS).map((p) => ({ id: p.id, label: p.label })),
       log: recentLogs(20),
+      capture: captureInfo(),
     });
   });
 
@@ -101,20 +103,26 @@ export function createDashboardApp() {
     const model = (req.body.model || "opus[1m]").trim();
     const url = buildUpstreamUrl(provider.base, "/v1/messages");
     const started = Date.now();
-    try {
-      const upstream = await fetch(url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${key.key}`,
-          "x-api-key": key.key,
+
+    // Replay the last real Claude Code request's headers if we've captured one,
+    // so the test looks like the genuine client. Fall back to a best-effort set.
+    const captured = getCapturedHeaders();
+    const headers = captured
+      ? { ...captured }
+      : {
           "anthropic-version": "2023-06-01",
-          // Best-effort: look like the official Claude Code CLI. Some providers
-          // (e.g. Freemodel) block requests that aren't from the real client.
           "user-agent": "claude-cli/2.1.14 (external, cli)",
           "x-app": "cli",
           "anthropic-beta": "claude-code-20250219",
-        },
+        };
+    headers["content-type"] = "application/json";
+    headers["authorization"] = `Bearer ${key.key}`;
+    headers["x-api-key"] = key.key;
+
+    try {
+      const upstream = await fetch(url, {
+        method: "POST",
+        headers,
         body: JSON.stringify({
           model,
           max_tokens: 1,
@@ -125,14 +133,21 @@ export function createDashboardApp() {
       const ok = upstream.status >= 200 && upstream.status < 300;
       let detail = "";
       let inconclusive = false;
+      let verdict = ok ? "ok" : "fail";
       if (!ok) {
         const text = await upstream.text();
         detail = text.slice(0, 300);
-        // Freemodel fingerprints the real Claude Code client and blocks
-        // synthetic pings with a 403 even when the key itself is fine. Flag
-        // that so the UI doesn't show a false failure.
         if (upstream.status === 403 && /official Claude Code client/i.test(text)) {
+          // Couldn't impersonate the CLI (no real request captured yet, or the
+          // provider fingerprints beyond headers). Not a key failure.
           inconclusive = true;
+          verdict = "no-cli";
+        } else if (/tier is insufficient/i.test(text) || /account tier/i.test(text)) {
+          // The account itself is tier-restricted for this model — a real,
+          // account-level block. The key is "valid" but can't serve this model.
+          verdict = "tier";
+        } else if (upstream.status === 401) {
+          verdict = "auth";
         }
       }
       addLog({
@@ -141,9 +156,23 @@ export function createDashboardApp() {
         method: "TEST",
         path: model,
         status: upstream.status,
-        note: inconclusive ? `can't self-test (provider blocks non-CLI)` : `health test (${ms}ms)`,
+        note:
+          verdict === "no-cli"
+            ? `can't self-test (provider blocks non-CLI)`
+            : verdict === "tier"
+            ? `account tier insufficient for ${model}`
+            : `health test (${ms}ms)`,
       });
-      res.json({ ok, status: upstream.status, latencyMs: ms, model, detail, inconclusive });
+      res.json({
+        ok,
+        status: upstream.status,
+        latencyMs: ms,
+        model,
+        detail,
+        inconclusive,
+        verdict,
+        usedCapturedHeaders: !!captured,
+      });
     } catch (err) {
       const ms = Date.now() - started;
       addLog({
