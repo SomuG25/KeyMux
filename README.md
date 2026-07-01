@@ -6,14 +6,14 @@ multiple providers (**AeroLink** and **Freemodel**) — so you set your base URL
 
 KeyMux sits between Claude Code and the real providers. Point Claude Code at
 `http://localhost:7777`, manage all your keys from a dark, polished dashboard at
-`http://localhost:7778`, and let KeyMux automatically rotate to the next key when
-one hits a rate limit (`429`) or auth error (`401`).
+`http://localhost:7778`, and switch keys yourself whenever you like — KeyMux
+never rotates on its own, so the active key only changes when you tell it to.
 
 ```
 ┌──────────────┐      ┌───────────────────────┐      ┌──────────────────────┐
 │ Claude Code  │ ───► │  KeyMux proxy :7777   │ ───► │ AeroLink / Freemodel │
-└──────────────┘      │  • picks active key   │      └──────────────────────┘
-                      │  • rotates on 429/401 │
+└──────────────┘      │  • uses active key    │      └──────────────────────┘
+                      │  • marks failed keys  │
                       │  • logs every request │      ┌──────────────────────┐
                       └───────────┬───────────┘ ◄─── │   Dashboard :7778    │
                                   │   shared store    │  add / test / rotate │
@@ -28,12 +28,15 @@ one hits a rate limit (`429`) or auth error (`401`).
 - **Multiple keys & accounts per provider.** Pool as many AeroLink / Freemodel
   keys as you like, each tagged with the **account** it came from.
 - **Weekly-limit tracking with auto-revive.** Each key has its own weekly reset
-  time. Mark a key **Exhausted** when its weekly cap is spent — KeyMux benches
-  it (and skips it during rotation) until its reset arrives, then automatically
-  brings it back and rolls the reset forward 7 days for the next cycle.
-- **Automatic rotation** on `429` / `401` / network errors — retries the request
-  once on the next **usable** key, preferring the **same provider first** (keeps
-  model compatibility intact), then any healthy key. Exhausted keys are skipped.
+  time. Mark a key **Exhausted** when its weekly cap is spent — KeyMux benches it
+  until its reset arrives, then automatically brings it back and rolls the reset
+  forward 7 days for the next cycle. (Benching never changes the active key —
+  switch that yourself.)
+- **Manual-only rotation.** The active key is **never** switched automatically.
+  On `429` / `401` / network errors KeyMux marks the key **Failed** (red) and
+  surfaces the error straight back to Claude Code — it stays active until you
+  pick another. Use **Set Active** or **Rotate Now** in the dashboard to move
+  traffic. Same-provider-first ordering when you do rotate.
 - **Live dashboard** — currently active key (masked), full pool with
   Active / Standby / Failed / Exhausted status, glowing indicators, account tags,
   reset countdowns, last-used times, and a live activity log (last 20 requests).
@@ -99,8 +102,9 @@ Paste this into `~/.claude/settings.json` (this is also printed on `npm start`):
 
 ### 3. Use Claude Code as normal
 
-All traffic now flows through KeyMux. Watch the live log light up, and let it
-rotate keys for you when one rate-limits.
+All traffic now flows through KeyMux. Watch the live log light up. When the active
+key rate-limits or errors, it turns red — switch to another via **Set Active** or
+**Rotate Now** in the dashboard (KeyMux won't move traffic on its own).
 
 ---
 
@@ -120,8 +124,9 @@ rotate keys for you when one rate-limits.
 
 - 🟢 **Active** — the key the proxy is currently using.
 - 🟡 **Standby** — healthy, waiting in the pool.
-- 🔴 **Failed** — last request returned `401`/`429` or errored. Re-activating or
-  testing it clears the failure.
+- 🔴 **Failed** — last request returned `401`/`429` or errored. The key stays
+  active and keeps receiving traffic until you switch — KeyMux does **not**
+  auto-rotate off it. Re-activating or testing it clears the failure.
 - 🔵 **Exhausted** — weekly limit spent. Skipped during rotation and
   auto-revived when its reset time arrives (reset then rolls forward 7 days).
 
@@ -133,10 +138,12 @@ every request and dashboard refresh that:
 1. Revives any **exhausted** key whose reset time has passed.
 2. Rolls a passed reset forward in 7-day steps so the countdown always points at
    the *next* weekly reset.
-3. Auto-advances the active key if it becomes exhausted/failed.
+3. Marks a key **failed** (display only) when its requests error — it does **not**
+   move the active key. Switch keys yourself via Set Active / Rotate Now.
 
 So you can mark a key exhausted the moment its weekly `$70` cap is gone and forget
-about it — it comes back online by itself a week later.
+about it — it comes back online by itself a week later. (The active pointer only
+ever moves when you move it, or when the active key is deleted.)
 
 ---
 
@@ -197,8 +204,9 @@ in `providers.js` to remap models for that provider only.
   retry), applies the active provider's model map (e.g. AeroLink Haiku→GLM), forwards to the
   active provider with `Authorization: Bearer <key>` (and `x-api-key`), and
   streams the response straight back (SSE-friendly).
-- On `429` / `401` / network error it marks the key **failed**, picks the next
-  key (same provider first), switches the active key, and **retries once**.
+- On `429` / `401` / network error it marks the key **failed** (red in the
+  dashboard) but does **not** rotate — the active key stays put and the error is
+  returned to Claude Code. Switch keys yourself via Set Active / Rotate Now.
 - **Store** (`src/store.js`) persists the pool to `keys.json`. The active key,
   statuses, and last-used times survive restarts.
 - **Log** (`src/log.js`) is an in-memory ring buffer shared by both servers.

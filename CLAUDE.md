@@ -54,8 +54,9 @@ agent trusts it.
 ## Architecture
 
 - `server.js` — boots proxy + dashboard in ONE process (shared store + log).
-- `src/proxy.js` — forwards traffic, auto-rotates on 401/429/network (same
-  provider first), buffers body for retry, rewrites Haiku→GLM, streams SSE back.
+- `src/proxy.js` — forwards traffic, marks the active key FAILED on 401/429/network
+  (but does NOT auto-rotate), rewrites every slot→GLM-5.2[1m] on AeroLink, streams
+  SSE back. Switch keys manually via the dashboard's Set Active / Rotate Now.
 - `src/dashboard.js` — REST API + serves `public/`. Endpoints listed above.
 - `src/store.js` — `keys.json` persistence, weekly-cycle reconcile, masking.
 - `src/providers.js` — provider registry (base URL, key prefix).
@@ -78,9 +79,15 @@ Override the GLM target with `KEYMUX_GLM_MODEL`. On Freemodel/AgentRouter
 ## Key features
 
 - Multiple keys/accounts per provider; each key tagged with its `account`.
-- Weekly-limit cycle: mark a key **Exhausted** (with reset time) → benched &
-  skipped in rotation → auto-revived at reset → reset rolls +7 days. One-time
-  credit keys (AgentRouter, `resetAt: null`) stay benched until manually restored.
+- **Manual-only rotation.** The active key NEVER changes on its own — not on
+  429/401/network errors, not when it's marked failed/exhausted. Switch keys via
+  the dashboard's **Set Active** or **Rotate Now**. A failing key stays active
+  (and shows red) until you pick another. `markFailed` only flips status for
+  display; it doesn't move traffic.
+- Weekly-limit cycle: mark a key **Exhausted** (with reset time) → stays benched
+  (but still active if it was active) → auto-revived at reset → reset rolls +7
+  days. One-time credit keys (AgentRouter, `resetAt: null`) stay benched until
+  manually restored.
 - Dashboard: active-key spotlight, status (active/standby/failed/exhausted),
   reset countdowns, live log, Set Active / Test (per-model) / Exhausted /
   Restore / Delete / Add / Rotate Now.

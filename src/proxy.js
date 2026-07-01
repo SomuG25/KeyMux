@@ -5,18 +5,13 @@
 import express from "express";
 import { Readable } from "node:stream";
 import { getProvider, buildUpstreamUrl } from "./providers.js";
-import {
-  getActiveKey,
-  pickNextKey,
-  setActive,
-  markUsed,
-  markFailed,
-  reconcile,
-} from "./store.js";
+import { getActiveKey, markUsed, markFailed, reconcile } from "./store.js";
 import { addLog } from "./log.js";
 import { captureHeaders } from "./capture.js";
 
-// Status codes that should trigger a rotation + single retry.
+// Status codes that mark the active key FAILED (so it shows red in the
+// dashboard). The proxy does NOT auto-rotate — switch keys via the dashboard's
+// Set Active / Rotate Now.
 const ROTATE_ON = new Set([401, 429]);
 
 // Model remapping is PER-PROVIDER, because each provider carries a different
@@ -128,113 +123,75 @@ export function createProxyApp() {
         .json({ error: { type: "keymux_error", message: "No active key. Add one in the KeyMux dashboard (http://localhost:7778)." } });
     }
 
-    let attempt = 0;
-    let rotated = false;
-    while (true) {
-      attempt++;
-      // Apply this provider's model map (re-applied if we rotate to another
-      // provider mid-request).
-      const { buf: bodyBuf, note: modelNote } = rewriteModel(
-        rawBuf,
-        req.headers["content-type"],
-        getProvider(key.provider)
-      );
-      try {
-        const { upstream, provider } = await forwardOnce(req, bodyBuf, key);
+    // Apply this provider's model map. The proxy does NOT auto-rotate on errors
+    // — a failed/bad key stays active until you switch via the dashboard.
+    const { buf: bodyBuf, note: modelNote } = rewriteModel(
+      rawBuf,
+      req.headers["content-type"],
+      getProvider(key.provider)
+    );
+    try {
+      const { upstream, provider } = await forwardOnce(req, bodyBuf, key);
 
-        if (ROTATE_ON.has(upstream.status) && attempt === 1) {
-          // Mark this key failed and rotate to the next candidate, then retry once.
-          markFailed(key.id);
+      // Mark the active key failed on rate-limit/auth so it shows red, but do
+      // NOT switch keys — surface the response straight back to Claude Code.
+      if (ROTATE_ON.has(upstream.status)) {
+        markFailed(key.id);
+      } else {
+        markUsed(key.id);
+      }
+      addLog({
+        keyLabel: key.label,
+        provider: provider.label,
+        method: req.method,
+        path: req.originalUrl,
+        status: upstream.status,
+        note: modelNote,
+      });
+
+      res.status(upstream.status);
+      upstream.headers.forEach((value, name) => {
+        if (STRIP_RESPONSE_HEADERS.has(name.toLowerCase())) return;
+        res.setHeader(name, value);
+      });
+
+      if (upstream.body) {
+        const nodeStream = Readable.fromWeb(upstream.body);
+        // If the upstream stream breaks mid-response (e.g. the network drops),
+        // it emits 'error'. Without a listener Node would crash the whole
+        // process — so handle it: log it and tear down this response only.
+        nodeStream.on("error", (err) => {
           addLog({
             keyLabel: key.label,
             provider: provider.label,
             method: req.method,
             path: req.originalUrl,
-            status: upstream.status,
-            note: "rotating (rate-limit/auth)",
-          });
-          const next = pickNextKey(key.id);
-          if (next && next.id !== key.id) {
-            setActive(next.id);
-            key = next;
-            rotated = true;
-            continue; // retry with the new key
-          }
-          // No alternative key — fall through and return this response.
-        }
-
-        // Success (or a non-rotatable error, or retry exhausted): stream it back.
-        markUsed(key.id);
-        addLog({
-          keyLabel: key.label,
-          provider: provider.label,
-          method: req.method,
-          path: req.originalUrl,
-          status: upstream.status,
-          note: [rotated ? "after rotation" : "", modelNote].filter(Boolean).join(" · "),
-        });
-
-        res.status(upstream.status);
-        upstream.headers.forEach((value, name) => {
-          if (STRIP_RESPONSE_HEADERS.has(name.toLowerCase())) return;
-          res.setHeader(name, value);
-        });
-
-        if (upstream.body) {
-          const nodeStream = Readable.fromWeb(upstream.body);
-          // If the upstream stream breaks mid-response (e.g. the network drops),
-          // it emits 'error'. Without a listener Node would crash the whole
-          // process — so handle it: log it and tear down this response only.
-          nodeStream.on("error", (err) => {
-            addLog({
-              keyLabel: key.label,
-              provider: provider.label,
-              method: req.method,
-              path: req.originalUrl,
-              status: null,
-              note: `stream interrupted: ${err.message}`,
-            });
-            if (!res.destroyed) res.destroy(err);
-          });
-          // If Claude Code hangs up, stop pulling from upstream.
-          res.on("close", () => nodeStream.destroy());
-          nodeStream.pipe(res);
-        } else {
-          res.end();
-        }
-        return;
-      } catch (err) {
-        // Network-level failure. Rotate + retry once, then give up.
-        if (attempt === 1) {
-          markFailed(key.id);
-          addLog({
-            keyLabel: key.label,
-            provider: getProvider(key.provider)?.label,
-            method: req.method,
-            path: req.originalUrl,
             status: null,
-            note: `network error: ${err.message} — rotating`,
+            note: `stream interrupted: ${err.message}`,
           });
-          const next = pickNextKey(key.id);
-          if (next && next.id !== key.id) {
-            setActive(next.id);
-            key = next;
-            rotated = true;
-            continue;
-          }
-        }
-        addLog({
-          keyLabel: key.label,
-          provider: getProvider(key.provider)?.label,
-          method: req.method,
-          path: req.originalUrl,
-          status: 502,
-          note: `upstream unreachable: ${err.message}`,
+          if (!res.destroyed) res.destroy(err);
         });
-        return res
-          .status(502)
-          .json({ error: { type: "keymux_error", message: `Upstream unreachable: ${err.message}` } });
+        // If Claude Code hangs up, stop pulling from upstream.
+        res.on("close", () => nodeStream.destroy());
+        nodeStream.pipe(res);
+      } else {
+        res.end();
       }
+      return;
+    } catch (err) {
+      // Network-level failure. Mark the key failed but stay on it — no rotation.
+      markFailed(key.id);
+      addLog({
+        keyLabel: key.label,
+        provider: getProvider(key.provider)?.label,
+        method: req.method,
+        path: req.originalUrl,
+        status: 502,
+        note: `upstream unreachable: ${err.message}`,
+      });
+      return res
+        .status(502)
+        .json({ error: { type: "keymux_error", message: `Upstream unreachable: ${err.message}` } });
     }
   });
 

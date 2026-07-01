@@ -68,9 +68,10 @@ export function getActiveKey() {
 }
 
 // ---------- Weekly-cycle reconciliation ----------
-// Roll any reset times that have passed forward by whole weeks, revive exhausted
-// keys whose reset has arrived, and make sure the active key is actually usable.
-// Called before every proxy request and every dashboard state read.
+// Roll any reset times that have passed forward by whole weeks and revive
+// exhausted keys whose reset has arrived. The active key is NEVER auto-switched
+// here — you change it via the dashboard's Set Active / Rotate Now. Called
+// before every proxy request and every dashboard state read.
 export function reconcile() {
   const now = Date.now();
   let changed = false;
@@ -88,19 +89,6 @@ export function reconcile() {
       while (t <= now) t += WEEK_MS;
       k.resetAt = new Date(t).toISOString();
       if (k.status === "exhausted") k.status = "standby"; // limit refreshed
-      changed = true;
-    }
-  }
-
-  // If the active key is no longer usable, advance to the next one that is.
-  const active = getActiveKey();
-  if (!active || !isUsable(active)) {
-    const next = pickNextKey(active ? active.id : null);
-    if (next) {
-      data.activeKeyId = next.id;
-      changed = true;
-    } else if (!active && data.activeKeyId !== null) {
-      data.activeKeyId = null;
       changed = true;
     }
   }
@@ -172,7 +160,9 @@ export function markFailed(id) {
 
 // Mark a key's weekly limit as used up. It stays benched until resetAt, then
 // reconcile() revives it. If resetAt isn't given, fall back to the key's known
-// weekly reset, else default to one week out.
+// weekly reset, else default to one week out. The active key is NOT auto-switched
+// — even if you bench the active key, it stays active (now flagged exhausted) so
+// you can choose the next one yourself via Set Active / Rotate Now.
 export function markExhausted(id, resetAt) {
   const key = getKeyById(id);
   if (!key) return false;
@@ -181,10 +171,6 @@ export function markExhausted(id, resetAt) {
   // One-time-credit keys (resetAt === null) stay benched until manually restored
   // or deleted — there's no weekly clock to revive them.
   if (resetAt) key.resetAt = new Date(resetAt).toISOString();
-  if (data.activeKeyId === id) {
-    const next = pickNextKey(id);
-    data.activeKeyId = next ? next.id : null;
-  }
   persist();
   return true;
 }
