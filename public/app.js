@@ -294,12 +294,17 @@ $("#runTestBtn").addEventListener("click", async () => {
     method: "POST",
     body: JSON.stringify({ model }),
   });
-  const cls = res.ok ? "ok" : "err";
-  const icon = res.ok ? "✓" : "✕";
+  const cls = res.ok ? "ok" : res.inconclusive ? "warn" : "err";
+  const icon = res.ok ? "✓" : res.inconclusive ? "?" : "✕";
   const statusTxt = res.status === null ? "no response" : `HTTP ${res.status}`;
+  const note = res.inconclusive
+    ? `<div class="res-detail">This provider blocks test pings from anything but the real Claude Code client, so the key can't be self-tested here. The key may still be fine — confirm by using it in Claude Code.</div>`
+    : res.detail
+    ? `<div class="res-detail">${escapeHtml(res.detail)}</div>`
+    : "";
   result.innerHTML = `
-    <div class="res-line ${cls}">${icon} ${statusTxt} · ${res.latencyMs}ms · ${escapeHtml(res.model)}</div>
-    ${res.detail ? `<div class="res-detail">${escapeHtml(res.detail)}</div>` : ""}`;
+    <div class="res-line ${cls}">${icon} ${statusTxt} · ${res.latencyMs}ms · ${escapeHtml(res.model)}${res.inconclusive ? " · inconclusive" : ""}</div>
+    ${note}`;
   refresh();
 });
 

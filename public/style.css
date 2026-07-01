@@ -356,6 +356,7 @@ input[type="datetime-local"] { color-scheme: dark; }
 }
 .res-line.ok { background: rgba(31, 212, 122, 0.1); color: var(--green); border: 1px solid rgba(31, 212, 122, 0.3); }
 .res-line.err { background: rgba(255, 77, 98, 0.1); color: var(--red); border: 1px solid rgba(255, 77, 98, 0.3); }
+.res-line.warn { background: rgba(255, 176, 32, 0.1); color: var(--amber); border: 1px solid rgba(255, 176, 32, 0.3); }
 .res-detail { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-top: 8px; white-space: pre-wrap; word-break: break-word; }
 .spinner {
   width: 14px; height: 14px; border-radius: 50%;

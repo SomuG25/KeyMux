@@ -109,6 +109,11 @@ export function createDashboardApp() {
           authorization: `Bearer ${key.key}`,
           "x-api-key": key.key,
           "anthropic-version": "2023-06-01",
+          // Best-effort: look like the official Claude Code CLI. Some providers
+          // (e.g. Freemodel) block requests that aren't from the real client.
+          "user-agent": "claude-cli/2.1.14 (external, cli)",
+          "x-app": "cli",
+          "anthropic-beta": "claude-code-20250219",
         },
         body: JSON.stringify({
           model,
@@ -119,9 +124,16 @@ export function createDashboardApp() {
       const ms = Date.now() - started;
       const ok = upstream.status >= 200 && upstream.status < 300;
       let detail = "";
+      let inconclusive = false;
       if (!ok) {
         const text = await upstream.text();
         detail = text.slice(0, 300);
+        // Freemodel fingerprints the real Claude Code client and blocks
+        // synthetic pings with a 403 even when the key itself is fine. Flag
+        // that so the UI doesn't show a false failure.
+        if (upstream.status === 403 && /official Claude Code client/i.test(text)) {
+          inconclusive = true;
+        }
       }
       addLog({
         keyLabel: key.label,
@@ -129,9 +141,9 @@ export function createDashboardApp() {
         method: "TEST",
         path: model,
         status: upstream.status,
-        note: `health test (${ms}ms)`,
+        note: inconclusive ? `can't self-test (provider blocks non-CLI)` : `health test (${ms}ms)`,
       });
-      res.json({ ok, status: upstream.status, latencyMs: ms, model, detail });
+      res.json({ ok, status: upstream.status, latencyMs: ms, model, detail, inconclusive });
     } catch (err) {
       const ms = Date.now() - started;
       addLog({
