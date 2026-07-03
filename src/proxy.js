@@ -19,7 +19,11 @@ const ROTATE_ON = new Set([401, 429]);
 // maps the Haiku slot → glm-5.2 (it's the one that serves GLM). Opus and Sonnet
 // pass through as real Claude everywhere. A raw glm-5.2* name passes through
 // unchanged, so the map is idempotent.
-function rewriteModel(bodyBuf, contentType, provider) {
+// `is1m` = the request asked for the 1M-context variant (Claude Code signals
+// this with an `anthropic-beta: context-1m-…` header, not a different model
+// name). A modelMap entry with `requires1m: true` only fires for 1M requests —
+// used to route "Sonnet (1M)" to a different model than plain Sonnet.
+function rewriteModel(bodyBuf, contentType, provider, is1m) {
   const map = provider?.modelMap;
   if (!map || map.length === 0) return { buf: bodyBuf, note: "" };
   if (!bodyBuf || !bodyBuf.length) return { buf: bodyBuf, note: "" };
@@ -29,12 +33,17 @@ function rewriteModel(bodyBuf, contentType, provider) {
   try {
     const obj = JSON.parse(bodyBuf.toString("utf8"));
     if (obj && typeof obj.model === "string") {
+      // The [1m] suffix can also appear in the model string itself.
+      const oneM = is1m || /\[1m\]/i.test(obj.model);
       for (const m of map) {
-        if (m.match.test(obj.model)) {
-          const from = obj.model;
-          obj.model = m.to;
-          return { buf: Buffer.from(JSON.stringify(obj)), note: `model ${from} → ${m.to}` };
-        }
+        if (!m.match.test(obj.model)) continue;
+        if (m.requires1m && !oneM) continue; // 1M-only rule, but this isn't 1M
+        const from = obj.model;
+        obj.model = m.to;
+        return {
+          buf: Buffer.from(JSON.stringify(obj)),
+          note: `model ${from}${oneM ? " (1M)" : ""} → ${m.to}`,
+        };
       }
     }
   } catch {
@@ -168,10 +177,12 @@ export function createProxyApp() {
 
     // Apply this provider's model map. The proxy does NOT auto-rotate on errors
     // — a failed/bad key stays active until you switch via the dashboard.
+    const is1m = /context-1m/i.test(String(req.headers["anthropic-beta"] || ""));
     const { buf: bodyBuf, note: modelNote } = rewriteModel(
       rawBuf,
       req.headers["content-type"],
-      getProvider(key.provider)
+      getProvider(key.provider),
+      is1m
     );
     try {
       const { upstream, provider } = await forwardOnce(req, bodyBuf, key);

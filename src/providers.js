@@ -5,9 +5,14 @@ export const PROVIDERS = {
     label: "AeroLink",
     base: "https://capi.aerolink.lat/",
     keyPrefix: "aero_live_",
-    // AeroLink serves GLM, so the Haiku (small/fast) slot maps to GLM here.
-    // Opus and Sonnet pass through as real Claude models.
-    modelMap: [{ match: /haiku/i, to: process.env.KEYMUX_GLM_MODEL || "glm-5.2" }],
+    // AeroLink serves GLM + Fable. Mappings (first match wins):
+    //  - Sonnet (1M) → Fable 5  (regular Sonnet passes through as real Claude)
+    //  - Haiku       → GLM-5.2
+    //  - Opus / plain Sonnet    → unchanged (real Claude)
+    modelMap: [
+      { match: /sonnet/i, requires1m: true, to: process.env.KEYMUX_SONNET1M_MODEL || "claude-fable-5" },
+      { match: /haiku/i, to: process.env.KEYMUX_GLM_MODEL || "glm-5.2" },
+    ],
   },
   freemodel: {
     id: "freemodel",

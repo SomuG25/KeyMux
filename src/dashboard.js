@@ -38,6 +38,19 @@ export function createDashboardApp() {
     });
   });
 
+  // Debug: what the last real Claude Code request's identifying headers were —
+  // used to confirm how "1M context" is signalled (anthropic-beta: context-1m…).
+  app.get("/api/_debug/capture", (_req, res) => {
+    const h = getCapturedHeaders() || {};
+    res.json({
+      ...captureInfo(),
+      "user-agent": h["user-agent"] || null,
+      "x-app": h["x-app"] || null,
+      "anthropic-beta": h["anthropic-beta"] || null,
+      is1mDetected: /context-1m/i.test(String(h["anthropic-beta"] || "")),
+    });
+  });
+
   app.get("/api/log", (_req, res) => {
     res.json({ log: recentLogs(20) });
   });
