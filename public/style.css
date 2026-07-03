@@ -247,6 +247,7 @@ main { padding: 28px 32px 60px; max-width: 1200px; margin: 0 auto; }
 .prov-aerolink { --prov-color: #7c5cff; }
 .prov-freemodel { --prov-color: #00d3a7; }
 .prov-agentrouter { --prov-color: #ffb020; }
+.prov-zenmux { --prov-color: #ff5ca2; }
 
 .group-head {
   display: flex; align-items: center; justify-content: space-between;

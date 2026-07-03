@@ -28,6 +28,22 @@ export const PROVIDERS = {
     keyPrefix: "sk-",
     oneTimeCredit: true, // one-time credit pool, no weekly reset
   },
+  zenmux: {
+    id: "zenmux",
+    label: "ZenMux",
+    base: "https://zenmux.ai/api/anthropic/",
+    keyPrefix: "sk-ai-v1-",
+    oneTimeCredit: true, // balance-based, no weekly reset
+    // ZenMux exposes free Anthropic models under -free ids. Route:
+    //  - Sonnet (1M) → free Fable 5   - Sonnet (regular) → free Sonnet 5
+    //  - any explicit fable → free Fable 5
+    // (Requires a positive ZenMux balance — even "free" models need it.)
+    modelMap: [
+      { match: /sonnet/i, requires1m: true, to: "anthropic/claude-fable-5-free" },
+      { match: /sonnet/i, to: "anthropic/claude-sonnet-5-free" },
+      { match: /fable/i, to: "anthropic/claude-fable-5-free" },
+    ],
+  },
 };
 
 export function getProvider(id) {
