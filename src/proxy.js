@@ -52,6 +52,31 @@ function rewriteModel(bodyBuf, contentType, provider, is1m) {
   return { buf: bodyBuf, note: "" };
 }
 
+// Adaptive-thinking models (Fable/Mythos-class, and some provider-side models
+// like GLM behind Anthropic-compat gateways) reject the legacy
+// `thinking: {type:"disabled"}` field — omitting it entirely is the new "off".
+// Claude Code still sends the legacy field on some internal calls (e.g.
+// WebSearch/WebFetch), which 400s with `"thinking.type.disabled" is not
+// supported for this model`. Since omitting the field is a valid "off" for
+// EVERY model, strip it unconditionally (no model-name gate). Runs AFTER model
+// rewriting so it also covers requests a modelMap upgraded.
+function sanitizeThinking(bodyBuf, contentType) {
+  if (!bodyBuf || !bodyBuf.length) return { buf: bodyBuf, note: "" };
+  if (contentType && !String(contentType).includes("application/json")) {
+    return { buf: bodyBuf, note: "" };
+  }
+  try {
+    const obj = JSON.parse(bodyBuf.toString("utf8"));
+    if (obj && obj.thinking && obj.thinking.type === "disabled") {
+      delete obj.thinking;
+      return { buf: Buffer.from(JSON.stringify(obj)), note: "stripped thinking:disabled" };
+    }
+  } catch {
+    /* not JSON — forward unchanged */
+  }
+  return { buf: bodyBuf, note: "" };
+}
+
 // Read the .model field out of a buffered JSON request body ("" if absent).
 function requestModel(bodyBuf) {
   if (!bodyBuf || !bodyBuf.length) return "";
@@ -178,12 +203,17 @@ export function createProxyApp() {
     // Apply this provider's model map. The proxy does NOT auto-rotate on errors
     // — a failed/bad key stays active until you switch via the dashboard.
     const is1m = /context-1m/i.test(String(req.headers["anthropic-beta"] || ""));
-    const { buf: bodyBuf, note: modelNote } = rewriteModel(
+    const { buf: rewrittenBuf, note: rewriteNote } = rewriteModel(
       rawBuf,
       req.headers["content-type"],
       getProvider(key.provider),
       is1m
     );
+    const { buf: bodyBuf, note: thinkingNote } = sanitizeThinking(
+      rewrittenBuf,
+      req.headers["content-type"]
+    );
+    const modelNote = [rewriteNote, thinkingNote].filter(Boolean).join("; ");
     try {
       const { upstream, provider } = await forwardOnce(req, bodyBuf, key);
       const glmSent = isGlmRequest(rawBuf, bodyBuf);
