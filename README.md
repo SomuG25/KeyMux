@@ -161,6 +161,8 @@ Providers are defined in [`src/providers.js`](src/providers.js):
 | AeroLink    | `https://capi.aerolink.lat/`  | `aero_live_` | weekly reset       |
 | Freemodel   | `https://cc.freemodel.dev/`   | `fe_oa_`     | weekly reset       |
 | AgentRouter | `https://agentrouter.org/`    | `sk-`        | one-time credits   |
+| OpenRouter | `https://openrouter.ai/api/`   | `sk-or-v1-`  | one-time credits   |
+| Kimi       | `https://api.moonshot.ai/anthropic/` | `sk-`  | one-time credits   |
 
 Add more providers by adding an entry there.
 
@@ -191,15 +193,19 @@ small/fast model). Opus and Sonnet pass through as real Claude everywhere.
 | `*sonnet*`        | *(real Sonnet)*        | *(real Sonnet)*      | Sonnet stays real Claude everywhere |
 | `*haiku*`         | → **`glm-5.2`**        | *(real Haiku)*       | only AeroLink serves GLM; Freemodel would `400` on `glm-5.2` |
 
+| Claude Code model | On **OpenRouter** | On **Kimi** |
+| ----------------- | ----------------- | ----------- |
+| `*opus*`, `*sonnet*`, `*fable*` | → **`moonshotai/kimi-k3`** | → **`kimi-k3`** |
+| `*haiku*` | → **`z-ai/glm-5.2`** | → **`kimi-k3`** |
+
 Override the GLM target with `KEYMUX_GLM_MODEL`. Add a `modelMap` to any provider
 in `providers.js` to remap models for that provider only.
 
-> ⚠️ **Never set Claude Code's `model` to a raw `glm-*` name.** GLM only works on
-> AeroLink keys — Freemodel 403s on it and a tier-locked AeroLink account 400s
-> with "暂不支持". Pick a Claude slot; the proxy rewrites the Haiku slot to GLM
-> only on AeroLink (where it's safe) and leaves everything else as real Claude.
-> If the active key rejects GLM, the proxy marks it **failed** (red) with a
-> reason and surfaces the error — it does **not** rotate off it.
+> ⚠️ **Never set Claude Code's `model` to a raw `glm-*` name.** Select a Claude
+> slot instead so KeyMux applies the active provider's safe mapping. AeroLink and
+> OpenRouter route Haiku to their respective GLM IDs; Kimi routes every Claude
+> slot to K3. If the active key rejects GLM, the proxy marks it **failed** (red)
+> with a reason and surfaces the error — it does **not** rotate off it.
 
 > **Note:** KeyMux can't rename the labels in Claude Code's `/model` picker
 > (those are Claude Code's). It only remaps what each slot routes to, per provider.

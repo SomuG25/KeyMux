@@ -44,6 +44,28 @@ export const PROVIDERS = {
       { match: /fable/i, to: "anthropic/claude-fable-5-free" },
     ],
   },
+  openrouter: {
+    id: "openrouter",
+    label: "OpenRouter",
+    base: "https://openrouter.ai/api/",
+    keyPrefix: "sk-or-v1-",
+    oneTimeCredit: true,
+    // Keep this profile intentionally limited to its two requested models:
+    // Kimi K3 is primary; Haiku-class work uses GLM-5.2.
+    modelMap: [
+      { match: /opus|sonnet|fable/i, to: "moonshotai/kimi-k3" },
+      { match: /haiku/i, to: "z-ai/glm-5.2" },
+    ],
+  },
+  kimi: {
+    id: "kimi",
+    label: "Kimi",
+    base: "https://api.moonshot.ai/anthropic/",
+    keyPrefix: "sk-",
+    oneTimeCredit: true,
+    // The verified Anthropic-compatible model identifier is Kimi K3.
+    modelMap: [{ match: /opus|sonnet|haiku|fable/i, to: "kimi-k3" }],
+  },
 };
 
 export function getProvider(id) {
