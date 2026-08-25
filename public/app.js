@@ -6,6 +6,8 @@ const PROVIDER_LABELS = {
   freemodel: "Freemodel",
   agentrouter: "AgentRouter",
   zenmux: "ZenMux",
+  openrouter: "OpenRouter",
+  kimi: "Kimi",
 };
 let providers = [];
 let testKeyId = null;
@@ -107,7 +109,7 @@ function renderKeys(state) {
 
   // Group keys by provider so AeroLink vs Freemodel are visually distinct, each
   // with a header showing how that provider's pool is doing (ready / benched).
-  const order = ["aerolink", "freemodel", "agentrouter", "zenmux"];
+  const order = ["aerolink", "freemodel", "agentrouter", "zenmux", "openrouter", "kimi"];
   const groups = {};
   for (const k of state.keys) (groups[k.provider] ||= []).push(k);
   const providerIds = Object.keys(groups).sort(

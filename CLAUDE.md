@@ -55,8 +55,8 @@ agent trusts it.
 
 - `server.js` — boots proxy + dashboard in ONE process (shared store + log).
 - `src/proxy.js` — forwards traffic, marks the active key FAILED on 401/429/network
-  (but does NOT auto-rotate), rewrites every slot→GLM-5.2[1m] on AeroLink, streams
-  SSE back. Switch keys manually via the dashboard's Set Active / Rotate Now.
+  (but does NOT auto-rotate), applies each provider's model map, and streams SSE
+  back. Switch keys manually via the dashboard's Set Active / Rotate Now.
 - `src/dashboard.js` — REST API + serves `public/`. Endpoints listed above.
 - `src/store.js` — `keys.json` persistence, weekly-cycle reconcile, masking.
 - `src/providers.js` — provider registry (base URL, key prefix).
@@ -70,6 +70,8 @@ agent trusts it.
 - Mid: **Sonnet 4.6** (`claude-sonnet-4-6`) — passthrough.
 - Small/fast (Haiku slot): **GLM-5.2** — proxy rewrites any `*haiku*` model →
   `glm-5.2` on AeroLink (override `KEYMUX_GLM_MODEL`).
+- OpenRouter: every Claude slot → **Ox Alpha** (`stealth/ox-alpha`, override
+  `KEYMUX_OPENROUTER_MODEL`).
 
 Opus/Sonnet/Haiku stay real Claude on Freemodel/AgentRouter (no `modelMap`). The
 proxy marks any key that rejects GLM as **failed** (red) with a reason, but does

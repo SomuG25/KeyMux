@@ -16,9 +16,9 @@ const ROTATE_ON = new Set([401, 429]);
 
 // Model remapping is PER-PROVIDER, because each provider carries a different
 // model catalog. A provider defines its own `modelMap` in providers.js; AeroLink
-// maps the Haiku slot → glm-5.2 (it's the one that serves GLM). Opus and Sonnet
-// pass through as real Claude everywhere. A raw glm-5.2* name passes through
-// unchanged, so the map is idempotent.
+// maps Haiku → GLM-5.2, while OpenRouter maps every Claude slot → Ox Alpha.
+// Explicit provider-native model names pass through unchanged, so maps are
+// idempotent.
 // `is1m` = the request asked for the 1M-context variant (Claude Code signals
 // this with an `anthropic-beta: context-1m-…` header, not a different model
 // name). A modelMap entry with `requires1m: true` only fires for 1M requests —

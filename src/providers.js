@@ -50,11 +50,13 @@ export const PROVIDERS = {
     base: "https://openrouter.ai/api/",
     keyPrefix: "sk-or-v1-",
     oneTimeCredit: true,
-    // Keep this profile intentionally limited to its two requested models:
-    // Kimi K3 is primary; Haiku-class work uses GLM-5.2.
+    // Use OpenRouter's Ox Alpha for every Claude Code model slot. Explicit
+    // OpenRouter model slugs still pass through unchanged.
     modelMap: [
-      { match: /opus|sonnet|fable/i, to: "moonshotai/kimi-k3" },
-      { match: /haiku/i, to: "z-ai/glm-5.2" },
+      {
+        match: /opus|sonnet|haiku|fable/i,
+        to: process.env.KEYMUX_OPENROUTER_MODEL || "stealth/ox-alpha",
+      },
     ],
   },
   kimi: {

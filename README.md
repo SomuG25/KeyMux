@@ -153,6 +153,7 @@ ever moves when you move it, or when the active key is deleted.)
 | --------------------- | ------- | --------------------- |
 | `KEYMUX_PROXY_PORT`   | `7777`  | Proxy listen port.    |
 | `KEYMUX_DASH_PORT`    | `7778`  | Dashboard listen port.|
+| `KEYMUX_OPENROUTER_MODEL` | `stealth/ox-alpha` | Model used for Claude slots on OpenRouter. |
 
 Providers are defined in [`src/providers.js`](src/providers.js):
 
@@ -167,7 +168,7 @@ Providers are defined in [`src/providers.js`](src/providers.js):
 Add more providers by adding an entry there.
 
 > **Providers must speak the Anthropic API** (`POST /v1/messages`), since that's
-> what Claude Code sends. AeroLink, Freemodel, and AgentRouter do. OpenAI-only
+> what Claude Code sends. The providers listed above expose compatible endpoints. OpenAI-only
 > gateways (e.g. BluesMinds) return `503 model_not_found` and aren't supported —
 > they'd need a request/response/SSE translation layer.
 
@@ -185,7 +186,8 @@ Model support differs per provider, so rewrites are **per-provider** (defined as
 sending a model a provider doesn't carry. The swap is shown in the activity log.
 
 By default **only the Haiku slot maps to GLM-5.2 on AeroLink** (the cheap
-small/fast model). Opus and Sonnet pass through as real Claude everywhere.
+small/fast model). Providers without a `modelMap` pass Claude model names through;
+OpenRouter and Kimi apply their mappings below.
 
 | Claude Code model | On **AeroLink**        | On **Freemodel**     | Why |
 | ----------------- | ---------------------- | -------------------- | --- |
@@ -195,16 +197,16 @@ small/fast model). Opus and Sonnet pass through as real Claude everywhere.
 
 | Claude Code model | On **OpenRouter** | On **Kimi** |
 | ----------------- | ----------------- | ----------- |
-| `*opus*`, `*sonnet*`, `*fable*` | → **`moonshotai/kimi-k3`** | → **`kimi-k3`** |
-| `*haiku*` | → **`z-ai/glm-5.2`** | → **`kimi-k3`** |
+| `*opus*`, `*sonnet*`, `*haiku*`, `*fable*` | → **`stealth/ox-alpha`** | → **`kimi-k3`** |
 
-Override the GLM target with `KEYMUX_GLM_MODEL`. Add a `modelMap` to any provider
-in `providers.js` to remap models for that provider only.
+Override the AeroLink GLM target with `KEYMUX_GLM_MODEL`, or the OpenRouter target
+with `KEYMUX_OPENROUTER_MODEL`. Add a `modelMap` to any provider in
+`providers.js` to remap models for that provider only.
 
 > ⚠️ **Never set Claude Code's `model` to a raw `glm-*` name.** Select a Claude
-> slot instead so KeyMux applies the active provider's safe mapping. AeroLink and
-> OpenRouter route Haiku to their respective GLM IDs; Kimi routes every Claude
-> slot to K3. If the active key rejects GLM, the proxy marks it **failed** (red)
+> slot instead so KeyMux applies the active provider's safe mapping. AeroLink
+> routes Haiku to GLM-5.2, OpenRouter routes every slot to Ox Alpha, and Kimi
+> routes every slot to K3. If the active key rejects GLM, the proxy marks it **failed** (red)
 > with a reason and surfaces the error — it does **not** rotate off it.
 
 > **Note:** KeyMux can't rename the labels in Claude Code's `/model` picker
