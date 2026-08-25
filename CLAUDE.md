@@ -70,8 +70,8 @@ agent trusts it.
 - Mid: **Sonnet 4.6** (`claude-sonnet-4-6`) — passthrough.
 - Small/fast (Haiku slot): **GLM-5.2** — proxy rewrites any `*haiku*` model →
   `glm-5.2` on AeroLink (override `KEYMUX_GLM_MODEL`).
-- OpenRouter: every Claude slot → **Ox Alpha** (`stealth/ox-alpha`, override
-  `KEYMUX_OPENROUTER_MODEL`).
+- OpenRouter: **every model string** — main, subagent, internal, or explicit — is
+  force-routed to **Ox Alpha** (`stealth/ox-alpha`). There is no override.
 
 Opus/Sonnet/Haiku stay real Claude on Freemodel/AgentRouter (no `modelMap`). The
 proxy marks any key that rejects GLM as **failed** (red) with a reason, but does

@@ -50,14 +50,9 @@ export const PROVIDERS = {
     base: "https://openrouter.ai/api/",
     keyPrefix: "sk-or-v1-",
     oneTimeCredit: true,
-    // Use OpenRouter's Ox Alpha for every Claude Code model slot. Explicit
-    // OpenRouter model slugs still pass through unchanged.
-    modelMap: [
-      {
-        match: /opus|sonnet|haiku|fable/i,
-        to: process.env.KEYMUX_OPENROUTER_MODEL || "stealth/ox-alpha",
-      },
-    ],
+    // Strict invariant: every Claude Code request, including subagent/internal
+    // model selections and explicit provider-native names, uses Ox Alpha.
+    forceModel: "stealth/ox-alpha",
   },
   kimi: {
     id: "kimi",

@@ -153,7 +153,6 @@ ever moves when you move it, or when the active key is deleted.)
 | --------------------- | ------- | --------------------- |
 | `KEYMUX_PROXY_PORT`   | `7777`  | Proxy listen port.    |
 | `KEYMUX_DASH_PORT`    | `7778`  | Dashboard listen port.|
-| `KEYMUX_OPENROUTER_MODEL` | `stealth/ox-alpha` | Model used for Claude slots on OpenRouter. |
 
 Providers are defined in [`src/providers.js`](src/providers.js):
 
@@ -197,15 +196,16 @@ OpenRouter and Kimi apply their mappings below.
 
 | Claude Code model | On **OpenRouter** | On **Kimi** |
 | ----------------- | ----------------- | ----------- |
-| `*opus*`, `*sonnet*`, `*haiku*`, `*fable*` | → **`stealth/ox-alpha`** | → **`kimi-k3`** |
+| **Any model name** (main, subagent, or internal) | → **`stealth/ox-alpha`** *(forced)* | Claude slots → **`kimi-k3`** |
 
-Override the AeroLink GLM target with `KEYMUX_GLM_MODEL`, or the OpenRouter target
-with `KEYMUX_OPENROUTER_MODEL`. Add a `modelMap` to any provider in
-`providers.js` to remap models for that provider only.
+Override the AeroLink GLM target with `KEYMUX_GLM_MODEL`. OpenRouter's Ox Alpha
+target is deliberately fixed: selecting any model in Claude Code, including a
+subagent model, is rewritten to `stealth/ox-alpha`. Add a `modelMap` to another
+provider in `providers.js` to selectively remap models for that provider only.
 
 > ⚠️ **Never set Claude Code's `model` to a raw `glm-*` name.** Select a Claude
 > slot instead so KeyMux applies the active provider's safe mapping. AeroLink
-> routes Haiku to GLM-5.2, OpenRouter routes every slot to Ox Alpha, and Kimi
+> routes Haiku to GLM-5.2, OpenRouter force-routes every model to Ox Alpha, and Kimi
 > routes every slot to K3. If the active key rejects GLM, the proxy marks it **failed** (red)
 > with a reason and surfaces the error — it does **not** rotate off it.
 

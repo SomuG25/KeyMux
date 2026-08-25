@@ -15,17 +15,18 @@ import { captureHeaders } from "./capture.js";
 const ROTATE_ON = new Set([401, 429]);
 
 // Model remapping is PER-PROVIDER, because each provider carries a different
-// model catalog. A provider defines its own `modelMap` in providers.js; AeroLink
-// maps Haiku → GLM-5.2, while OpenRouter maps every Claude slot → Ox Alpha.
-// Explicit provider-native model names pass through unchanged, so maps are
-// idempotent.
+// model catalog. A provider can define `forceModel` (every model string is
+// replaced) or `modelMap` (selective rules). OpenRouter force-routes all main,
+// subagent, and internal requests to Ox Alpha; AeroLink selectively maps Haiku
+// → GLM-5.2.
 // `is1m` = the request asked for the 1M-context variant (Claude Code signals
 // this with an `anthropic-beta: context-1m-…` header, not a different model
 // name). A modelMap entry with `requires1m: true` only fires for 1M requests —
 // used to route "Sonnet (1M)" to a different model than plain Sonnet.
-function rewriteModel(bodyBuf, contentType, provider, is1m) {
+export function rewriteModel(bodyBuf, contentType, provider, is1m) {
+  const forcedModel = provider?.forceModel;
   const map = provider?.modelMap;
-  if (!map || map.length === 0) return { buf: bodyBuf, note: "" };
+  if (!forcedModel && (!map || map.length === 0)) return { buf: bodyBuf, note: "" };
   if (!bodyBuf || !bodyBuf.length) return { buf: bodyBuf, note: "" };
   if (contentType && !String(contentType).includes("application/json")) {
     return { buf: bodyBuf, note: "" };
@@ -35,6 +36,14 @@ function rewriteModel(bodyBuf, contentType, provider, is1m) {
     if (obj && typeof obj.model === "string") {
       // The [1m] suffix can also appear in the model string itself.
       const oneM = is1m || /\[1m\]/i.test(obj.model);
+      if (forcedModel) {
+        const from = obj.model;
+        obj.model = forcedModel;
+        return {
+          buf: Buffer.from(JSON.stringify(obj)),
+          note: `model ${from}${oneM ? " (1M)" : ""} → ${forcedModel} (forced)`,
+        };
+      }
       for (const m of map) {
         if (!m.match.test(obj.model)) continue;
         if (m.requires1m && !oneM) continue; // 1M-only rule, but this isn't 1M
